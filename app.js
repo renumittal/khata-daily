@@ -4,6 +4,7 @@ const DEFAULT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxil_1IMTjAO_F
 let entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 let showingAll = false;
 let people = [];
+let transactionType = 'credit';
 
 const $ = (id) => document.getElementById(id);
 const currency = (value) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(value);
@@ -76,14 +77,23 @@ function loadPeople() {
   document.body.appendChild(script);
 }
 
+function setTransactionType(type) {
+  transactionType = type;
+  $('creditButton').classList.toggle('active', type === 'credit');
+  $('debitButton').classList.toggle('active', type === 'debit');
+}
+
+$('creditButton').addEventListener('click', () => setTransactionType('credit'));
+$('debitButton').addEventListener('click', () => setTransactionType('debit'));
+
 $('date').value = today();
 $('entryForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const amounts = [...document.querySelectorAll('.person-amount')].filter((input) => Number(input.value) > 0);
   if (!amounts.length) { showToast('Enter an amount for at least one person'); return; }
-  const common = { type:$('isCredit').checked ? 'credit' : 'debit', category:$('category').value, date:$('date').value, note:$('note').value.trim(), createdAt:new Date().toISOString() };
+  const common = { type:transactionType, category:$('category').value, date:$('date').value, note:$('note').value.trim(), createdAt:new Date().toISOString() };
   const newEntries = amounts.map((input) => ({ ...common, id:crypto.randomUUID(), person:input.dataset.person, amount:Number(input.value) }));
-  entries.push(...newEntries); localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); render(); event.target.reset(); $('date').value = today(); $('isCredit').checked = true; renderPeople();
+  entries.push(...newEntries); localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); render(); event.target.reset(); $('date').value = today(); setTransactionType('credit'); renderPeople();
   const results = await Promise.all(newEntries.map(syncEntry)); showToast(results.every(Boolean) ? 'Saved and synced to Google Sheet' : 'Saved on this phone');
 });
 $('clearFilter').addEventListener('click', () => { showingAll = !showingAll; render(); });

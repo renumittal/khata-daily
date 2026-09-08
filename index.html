@@ -45,7 +45,10 @@
         <span class="sync-pill" id="syncStatus"><i></i> Local</span>
       </div>
       <form id="entryForm">
-        <label class="check-row"><input id="isCredit" type="checkbox" checked><span>Credit received</span></label>
+        <div class="type-switch" role="group" aria-label="Transaction type">
+          <button type="button" class="type-option active" id="creditButton" data-type="credit">Credit<small>Money in</small></button>
+          <button type="button" class="type-option" id="debitButton" data-type="debit">Debit<small>Money out</small></button>
+        </div>
         <div class="people-heading"><span>People and amounts</span><small id="peopleStatus">Loading names...</small></div>
         <div class="people-list" id="peopleList"><div class="people-placeholder">Add names in Sheet1 column A.</div></div>
         <label>Category <span class="optional">optional</span><select id="category" name="category"><option value="">Choose a category</option><option>Groceries</option><option>Rent</option><option>Utilities</option><option>Travel</option><option>School</option><option>Medical</option><option>Other</option></select></label>
