@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4efe7">
+  <meta name="description" content="Track daily credit and debit with people.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>Khata Daily</title>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PERSONAL LEDGER</p>
+        <h1>Khata Daily</h1>
+      </div>
+      <button class="icon-button" id="settingsButton" aria-label="Open settings" title="Settings">⚙</button>
+    </header>
+
+    <section class="summary-grid" aria-label="Today's summary">
+      <article class="summary-card credit-card">
+        <span>Credit in</span>
+        <strong id="creditTotal">₹0</strong>
+      </article>
+      <article class="summary-card debit-card">
+        <span>Debit out</span>
+        <strong id="debitTotal">₹0</strong>
+      </article>
+      <article class="summary-card balance-card">
+        <span>Net today</span>
+        <strong id="netTotal">₹0</strong>
+      </article>
+    </section>
+
+    <section class="entry-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">NEW ENTRY</p>
+          <h2>Record a transaction</h2>
+        </div>
+        <span class="sync-pill" id="syncStatus"><i></i> Local</span>
+      </div>
+      <form id="entryForm">
+        <label class="check-row"><input id="isCredit" type="checkbox" checked><span>Credit received</span></label>
+        <div class="people-heading"><span>People and amounts</span><small id="peopleStatus">Loading names...</small></div>
+        <div class="people-list" id="peopleList"><div class="people-placeholder">Add names in Sheet1 column A.</div></div>
+        <label>Category <span class="optional">optional</span><select id="category" name="category"><option value="">Choose a category</option><option>Groceries</option><option>Rent</option><option>Utilities</option><option>Travel</option><option>School</option><option>Medical</option><option>Other</option></select></label>
+        <div class="field-row">
+          <label>Date<input id="date" name="date" type="date" required></label>
+        </div>
+        <label>Note <span class="optional">optional</span><input id="note" name="note" placeholder="Reason or reference"></label>
+        <button class="primary-button" type="submit"><span>＋</span> Save transaction</button>
+      </form>
+    </section>
+
+    <section class="ledger-section">
+      <div class="section-heading compact">
+        <div><p class="eyebrow">RECENT ACTIVITY</p><h2 id="activityTitle">Today</h2></div>
+        <button class="text-button" id="clearFilter">View all</button>
+      </div>
+      <div class="transaction-list" id="transactionList"></div>
+      <div class="empty-state" id="emptyState"><span>◎</span><p>No transactions yet</p><small>Your entries will appear here.</small></div>
+    </section>
+  </main>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="dialog-card" id="settingsForm">
+      <button class="close-button" value="cancel" aria-label="Close settings">×</button>
+      <p class="eyebrow">CONNECTION</p><h2>Google Sheet</h2>
+      <p class="dialog-copy">Paste your deployed Google Apps Script web app URL to sync entries automatically.</p>
+      <label>Apps Script URL<input id="endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec"></label>
+      <button class="primary-button" value="default" type="submit">Save connection</button>
+      <button class="danger-button" id="exportButton" type="button">Export local entries</button>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
