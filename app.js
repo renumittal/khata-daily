@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'khata-daily-entries';
 const ENDPOINT_KEY = 'khata-daily-endpoint';
-const DEFAULT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxil_1IMTjAO_F34foGWWUA0XQh_7lBrGH_iR-DiyydEGXsvdjfzm1LDwRHRQFRcVTrkw/exec';
+const DEFAULT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwoSVEQ7aqWTrrPN3Bz1tvfJG05LweLtw8X8QcawHJbnUuBwGTFL3ybKTj4eEECUvC5tw/exec';
 let entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 let showingAll = false;
 let people = [];
@@ -34,7 +34,7 @@ function showToast(message) { const toast = $('toast'); toast.textContent = mess
 function setSyncState(online) { $('syncStatus').classList.toggle('online', online); $('syncStatus').innerHTML = `<i></i> ${online ? 'Connected' : 'Local'}`; }
 
 function syncEntry(entry) {
-  const endpoint = localStorage.getItem(ENDPOINT_KEY);
+  const endpoint = localStorage.getItem(ENDPOINT_KEY) || DEFAULT_ENDPOINT;
   if (!endpoint) return Promise.resolve(false);
   return new Promise((resolve) => {
     const callbackName = `khataSave${Date.now()}${Math.random().toString(36).slice(2)}`;
@@ -100,7 +100,6 @@ $('clearFilter').addEventListener('click', () => { showingAll = !showingAll; ren
 $('settingsButton').addEventListener('click', () => { $('endpoint').value = localStorage.getItem(ENDPOINT_KEY) || ''; $('settingsDialog').showModal(); });
 $('settingsForm').addEventListener('submit', (event) => { event.preventDefault(); localStorage.setItem(ENDPOINT_KEY, $('endpoint').value.trim()); $('settingsDialog').close(); showToast('Connection saved, checking...'); loadPeople(); });
 $('exportButton').addEventListener('click', () => { const blob = new Blob([JSON.stringify(entries, null, 2)], { type:'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `khata-daily-${today()}.json`; link.click(); URL.revokeObjectURL(link.href); });
-if (!localStorage.getItem(ENDPOINT_KEY)) localStorage.setItem(ENDPOINT_KEY, DEFAULT_ENDPOINT);
 render();
 loadPeople();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
