@@ -43,7 +43,7 @@ button {
 .app-shell {
     width: min(100% - 32px, 620px);
     margin: 0 auto;
-    padding: 34px 0 60px;
+    padding: 34px 0 calc(84px + env(safe-area-inset-bottom));
     position: relative;
 }
 
@@ -606,6 +606,209 @@ dialog::backdrop {
 .toast.show {
     opacity: 1;
     transform: translate(-50%,0);
+}
+
+.tab-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: space-around;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+    z-index: 10;
+}
+
+.tab-button {
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 18px;
+}
+
+.tab-button.active {
+    color: var(--green);
+}
+
+.tab-icon {
+    font-size: 19px;
+}
+
+.view-title {
+    font-size: 26px;
+    margin-bottom: 16px;
+}
+
+.search-input {
+    margin-bottom: 16px;
+}
+
+.people-directory {
+    display: grid;
+    gap: 10px;
+}
+
+.person-summary-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+}
+
+.person-avatar {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--green-soft);
+    color: var(--green);
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    font-family: 'Space Grotesk',sans-serif;
+}
+
+.person-summary-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.person-summary-name {
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.person-summary-meta {
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.person-summary-balance {
+    text-align: right;
+}
+
+.person-summary-balance strong {
+    display: block;
+    font-family: 'Space Grotesk',sans-serif;
+    font-size: 15px;
+}
+
+.person-summary-balance small {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 30px;
+}
+
+.person-summary-balance.owed strong {
+    color: var(--green);
+}
+
+.person-summary-balance.owed small {
+    color: var(--green);
+    background: var(--green-soft);
+}
+
+.person-summary-balance.owing strong {
+    color: var(--red);
+}
+
+.person-summary-balance.owing small {
+    color: var(--red);
+    background: var(--red-soft);
+}
+
+.person-summary-balance.settled small {
+    color: var(--muted);
+    background: var(--paper);
+}
+
+.detail-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.detail-header h2 {
+    font-size: 20px;
+}
+
+.person-balance-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px;
+    margin-bottom: 16px;
+}
+
+.person-balance-card.owed strong {
+    color: var(--green);
+}
+
+.person-balance-card.owing strong {
+    color: var(--red);
+}
+
+.balance-label {
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.person-balance-card strong {
+    font-family: 'Space Grotesk',sans-serif;
+    font-size: 26px;
+}
+
+.balance-bar {
+    height: 6px;
+    border-radius: 30px;
+    background: var(--red-soft);
+    margin: 14px 0 10px;
+    overflow: hidden;
+}
+
+.balance-bar-fill {
+    height: 100%;
+    background: var(--green);
+}
+
+.balance-split {
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.balance-split b {
+    color: var(--ink);
+}
+
+.filter-switch {
+    grid-template-columns: repeat(3,1fr);
+}
+
+.sticky-add {
+    margin-top: 16px;
 }
 
 @media (max-width: 430px) {

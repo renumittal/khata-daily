@@ -18,52 +18,94 @@
         <p class="eyebrow">PERSONAL LEDGER</p>
         <h1>Khata Daily</h1>
       </div>
-      <button class="icon-button" id="settingsButton" aria-label="Open settings" title="Settings">⚙</button>
     </header>
 
-    <section class="summary-grid" aria-label="Today's summary">
-      <article class="summary-card credit-card">
-        <span>Credit in</span>
-        <strong id="creditTotal">₹0</strong>
-      </article>
-      <article class="summary-card debit-card">
-        <span>Debit out</span>
-        <strong id="debitTotal">₹0</strong>
-      </article>
-      <article class="summary-card balance-card">
-        <span>Net today</span>
-        <strong id="netTotal">₹0</strong>
-      </article>
+    <section id="homeView" class="view">
+      <section class="summary-grid" aria-label="Today's summary">
+        <article class="summary-card credit-card">
+          <span>Credit in</span>
+          <strong id="creditTotal">₹0</strong>
+        </article>
+        <article class="summary-card debit-card">
+          <span>Debit out</span>
+          <strong id="debitTotal">₹0</strong>
+        </article>
+        <article class="summary-card balance-card">
+          <span>Net today</span>
+          <strong id="netTotal">₹0</strong>
+        </article>
+      </section>
+
+      <section class="entry-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">NEW ENTRY</p>
+            <h2>Record a transaction</h2>
+          </div>
+          <span class="sync-pill" id="syncStatus"><i></i> Local</span>
+        </div>
+        <form id="entryForm">
+          <div class="type-switch" role="group" aria-label="Transaction type">
+            <button type="button" class="type-option active" id="creditButton" data-type="credit">Credit<small>Money in</small></button>
+            <button type="button" class="type-option" id="debitButton" data-type="debit">Debit<small>Money out</small></button>
+          </div>
+          <div class="people-heading"><span>People and amounts</span><small id="peopleStatus">Loading names...</small></div>
+          <div class="people-list" id="peopleList"><div class="people-placeholder">Add names from Settings → Manage names.</div></div>
+          <button class="primary-button" type="submit"><span>＋</span> Save transaction</button>
+        </form>
+      </section>
+
+      <section class="ledger-section">
+        <div class="section-heading compact">
+          <div><p class="eyebrow">RECENT ACTIVITY</p><h2 id="activityTitle">Today</h2></div>
+          <button class="text-button" id="clearFilter">View all</button>
+        </div>
+        <div class="transaction-list" id="transactionList"></div>
+        <div class="empty-state" id="emptyState"><span>◎</span><p>No transactions yet</p><small>Your entries will appear here.</small></div>
+      </section>
     </section>
 
-    <section class="entry-panel">
-      <div class="section-heading">
+    <section id="peopleView" class="view" hidden>
+      <p class="eyebrow">LEDGER</p>
+      <h2 class="view-title">People</h2>
+      <input id="peopleSearch" class="search-input" type="search" placeholder="Search a name">
+      <div class="people-directory" id="peopleDirectory"></div>
+      <div class="empty-state" id="peopleDirectoryEmpty" hidden><span>◎</span><p>No people yet</p><small>Add names from Settings → Manage names.</small></div>
+    </section>
+
+    <section id="personDetailView" class="view" hidden>
+      <div class="detail-header">
+        <button type="button" class="icon-button" id="personBackButton" aria-label="Back to people">‹</button>
         <div>
-          <p class="eyebrow">NEW ENTRY</p>
-          <h2>Record a transaction</h2>
+          <h2 id="personDetailName">Name</h2>
+          <small id="personDetailMeta" class="dialog-copy">0 entries</small>
         </div>
-        <span class="sync-pill" id="syncStatus"><i></i> Local</span>
       </div>
-      <form id="entryForm">
-        <div class="type-switch" role="group" aria-label="Transaction type">
-          <button type="button" class="type-option active" id="creditButton" data-type="credit">Credit<small>Money in</small></button>
-          <button type="button" class="type-option" id="debitButton" data-type="debit">Debit<small>Money out</small></button>
+      <div class="person-balance-card" id="personBalanceCard">
+        <span class="balance-label" id="personBalanceLabel">Settled</span>
+        <strong id="personBalanceAmount">₹0</strong>
+        <div class="balance-bar"><div class="balance-bar-fill" id="personBalanceFill"></div></div>
+        <div class="balance-split">
+          <span>Credit in <b id="personCreditTotal">₹0</b></span>
+          <span>Debit out <b id="personDebitTotal">₹0</b></span>
         </div>
-        <div class="people-heading"><span>People and amounts</span><small id="peopleStatus">Loading names...</small></div>
-        <div class="people-list" id="peopleList"><div class="people-placeholder">Add names from Settings → Manage names.</div></div>
-        <button class="primary-button" type="submit"><span>＋</span> Save transaction</button>
-      </form>
-    </section>
-
-    <section class="ledger-section">
-      <div class="section-heading compact">
-        <div><p class="eyebrow">RECENT ACTIVITY</p><h2 id="activityTitle">Today</h2></div>
-        <button class="text-button" id="clearFilter">View all</button>
       </div>
-      <div class="transaction-list" id="transactionList"></div>
-      <div class="empty-state" id="emptyState"><span>◎</span><p>No transactions yet</p><small>Your entries will appear here.</small></div>
+      <div class="type-switch filter-switch" role="group" aria-label="Filter transactions">
+        <button type="button" class="type-option active" data-filter="all">All</button>
+        <button type="button" class="type-option" data-filter="credit">Credit</button>
+        <button type="button" class="type-option" data-filter="debit">Debit</button>
+      </div>
+      <div class="transaction-list" id="personTransactionList"></div>
+      <div class="empty-state" id="personTransactionEmpty" hidden><span>◎</span><p>No transactions</p><small>Nothing recorded for this person yet.</small></div>
+      <button class="primary-button sticky-add" id="personAddEntryButton" type="button"><span>＋</span> Add entry</button>
     </section>
   </main>
+
+  <nav class="tab-bar" aria-label="Sections">
+    <button type="button" class="tab-button active" data-view="home"><span class="tab-icon">⌂</span>Home</button>
+    <button type="button" class="tab-button" data-view="people"><span class="tab-icon">☰</span>People</button>
+    <button type="button" class="tab-button" id="settingsTabButton"><span class="tab-icon">⚙</span>Settings</button>
+  </nav>
 
   <dialog id="settingsDialog">
     <form method="dialog" class="dialog-card" id="settingsForm">
