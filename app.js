@@ -91,7 +91,7 @@ $('entryForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const amounts = [...document.querySelectorAll('.person-amount')].filter((input) => Number(input.value) > 0);
   if (!amounts.length) { showToast('Enter an amount for at least one person'); return; }
-  const common = { type:transactionType, category:$('category').value, date:$('date').value, note:$('note').value.trim(), createdAt:new Date().toISOString() };
+  const common = { type:transactionType, category:'', date:$('date').value, note:$('note').value.trim(), createdAt:new Date().toISOString() };
   const newEntries = amounts.map((input) => ({ ...common, id:crypto.randomUUID(), person:input.dataset.person, amount:Number(input.value) }));
   entries.push(...newEntries); localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); render(); event.target.reset(); $('date').value = today(); setTransactionType('credit'); renderPeople();
   const results = await Promise.all(newEntries.map(syncEntry)); showToast(results.every(Boolean) ? 'Saved and synced to Google Sheet' : 'Saved on this phone');
