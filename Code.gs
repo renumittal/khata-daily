@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = '1GiL6u7h5uzf1IkL_1XYQQCxXROmyizHPMGhwU2RabIM';
-const PEOPLE_SHEET_NAME = 'Sheet1';
-const TRANSACTIONS_SHEET_NAME = 'Transactions';
+const PEOPLE_SHEET_NAME = 'People';
+const TRANSACTIONS_SHEET_NAME = 'Detail Transaction';
 
 function getSpreadsheet() {
   return SpreadsheetApp.openById(SPREADSHEET_ID);
