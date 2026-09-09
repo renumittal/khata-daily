@@ -47,6 +47,36 @@ function findPersonRow(rows, name) {
   return rows.find((entry) => entry.name.toLowerCase() === target);
 }
 
+function toDateString(value, timeZone) {
+  if (value instanceof Date) return Utilities.formatDate(value, timeZone, 'yyyy-MM-dd');
+  return String(value || '').slice(0, 10);
+}
+
+function toIsoString(value) {
+  if (value instanceof Date) return value.toISOString();
+  return String(value || '');
+}
+
+function readTransactions() {
+  const sheet = getTransactionsSheet();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const timeZone = getSpreadsheet().getSpreadsheetTimeZone();
+  const values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+  return values
+    .filter((row) => row[6])
+    .map((row) => ({
+      date: toDateString(row[0], timeZone),
+      type: String(row[1] || ''),
+      person: String(row[2] || ''),
+      category: String(row[3] || ''),
+      amount: Number(row[4]) || 0,
+      note: String(row[5] || ''),
+      id: String(row[6]),
+      createdAt: toIsoString(row[7]),
+    }));
+}
+
 function respond(e, payload) {
   const result = JSON.stringify(payload);
   const callback = e && e.parameter && e.parameter.callback;
@@ -90,6 +120,10 @@ function doGet(e) {
     if (!existing) return respond(e, { ok: false, error: 'Not found' });
     sheet.getRange(existing.row, 2).setValue(params.active === 'false' ? 'inactive' : '');
     return respond(e, { ok: true });
+  }
+
+  if (params.action === 'transactions') {
+    return respond(e, { ok: true, transactions: readTransactions() });
   }
 
   if (params.action === 'allPeople') {

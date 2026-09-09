@@ -7,13 +7,22 @@ let people = [];
 let transactionType = 'credit';
 let selectedPerson = null;
 let personFilter = 'all';
+let remoteTransactions = [];
+
+function allEntries() {
+  const map = new Map();
+  remoteTransactions.forEach((entry) => map.set(entry.id, entry));
+  entries.forEach((entry) => map.set(entry.id, entry));
+  return [...map.values()];
+}
 
 const $ = (id) => document.getElementById(id);
 const currency = (value) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(value);
 const today = () => new Date().toISOString().slice(0, 10);
 
 function render() {
-  const visible = showingAll ? entries : entries.filter((entry) => entry.date === today());
+  const combined = allEntries();
+  const visible = showingAll ? combined : combined.filter((entry) => entry.date === today());
   const credit = visible.filter((entry) => entry.type === 'credit').reduce((sum, entry) => sum + entry.amount, 0);
   const debit = visible.filter((entry) => entry.type === 'debit').reduce((sum, entry) => sum + entry.amount, 0);
   $('creditTotal').textContent = currency(credit);
@@ -73,6 +82,14 @@ function renderPeople() {
   $('peopleStatus').textContent = people.length ? `${people.length} people` : 'No names found';
 }
 
+async function loadTransactions() {
+  const response = await jsonpRequest({ action:'transactions' });
+  if (!response || !response.ok) return false;
+  remoteTransactions = response.transactions || [];
+  render();
+  return true;
+}
+
 async function loadPeople() {
   const response = await jsonpRequest({});
   if (!response) {
@@ -120,7 +137,7 @@ async function setPersonActive(name, active) {
 }
 
 function personSummary(name) {
-  const list = entries.filter((entry) => entry.person === name).sort((a, b) => `${a.date}${a.createdAt}`.localeCompare(`${b.date}${b.createdAt}`));
+  const list = allEntries().filter((entry) => entry.person === name).sort((a, b) => `${a.date}${a.createdAt}`.localeCompare(`${b.date}${b.createdAt}`));
   const credit = list.filter((entry) => entry.type === 'credit').reduce((sum, entry) => sum + entry.amount, 0);
   const debit = list.filter((entry) => entry.type === 'debit').reduce((sum, entry) => sum + entry.amount, 0);
   return { list, count: list.length, firstDate: list[0]?.date, lastDate: list[list.length - 1]?.date, credit, debit, net: credit - debit };
@@ -131,7 +148,7 @@ function switchView(view) {
   $('peopleView').hidden = view !== 'people';
   $('personDetailView').hidden = view !== 'personDetail';
   document.querySelectorAll('.tab-button[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view || (view === 'personDetail' && button.dataset.view === 'people')));
-  if (view === 'people') renderPeopleDirectory();
+  if (view === 'people') { renderPeopleDirectory(); loadTransactions().then(() => { if (!$('peopleView').hidden) renderPeopleDirectory(); }); }
   if (view === 'personDetail') renderPersonDetail();
 }
 
@@ -250,4 +267,5 @@ $('managePeopleList').addEventListener('click', (event) => {
 $('exportButton').addEventListener('click', () => { const blob = new Blob([JSON.stringify(entries, null, 2)], { type:'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `khata-daily-${today()}.json`; link.click(); URL.revokeObjectURL(link.href); });
 render();
 loadPeople();
+loadTransactions();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
