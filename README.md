@@ -11,7 +11,9 @@ A phone-first daily credit/debit tracker that stores entries locally and can syn
 5. Deploy, authorize access, and copy the web app URL ending in `/exec`.
 6. Open the app, tap the gear button, paste the URL, and save the connection.
 
-Put the people names in column A of `Sheet1`, starting at row 2, with `People` in cell A1. The app displays every name with an amount box beside it, so multiple people can be saved together with one button. The script reads names from `Sheet1` and automatically creates a separate `Transactions` tab for saved entries. Each entry also supports an optional household category such as groceries, rent, or utilities.
+People live in `Sheet1`, column A, starting at row 2 (`People` in cell A1). You can add names either by typing directly in the Sheet, or from the app itself: gear icon → **Manage names** → type a name → **Add**. The app displays every active name with a Date, Purpose, and Amount, so multiple people can be saved together with one button. The script automatically creates a separate `Transactions` tab for saved entries.
+
+Column B of `Sheet1` marks a person's status: leave it blank for active, or set it to `inactive` to hide them from the app without deleting their name or their past entries. Toggling a name's "Active"/"Inactive" pill from Settings → Manage names does this for you automatically.
 
 If the app says `Check Apps Script access`, open **Deploy > Manage deployments**, edit the web app, create a **New version**, and set **Who has access** to **Anyone**. The deployed URL must open without asking you to sign in. Then refresh the app.
 

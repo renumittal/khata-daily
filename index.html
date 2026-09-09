@@ -50,7 +50,7 @@
           <button type="button" class="type-option" id="debitButton" data-type="debit">Debit<small>Money out</small></button>
         </div>
         <div class="people-heading"><span>People and amounts</span><small id="peopleStatus">Loading names...</small></div>
-        <div class="people-list" id="peopleList"><div class="people-placeholder">Add names in Sheet1 column A.</div></div>
+        <div class="people-list" id="peopleList"><div class="people-placeholder">Add names from Settings → Manage names.</div></div>
         <button class="primary-button" type="submit"><span>＋</span> Save transaction</button>
       </form>
     </section>
@@ -72,6 +72,15 @@
       <p class="dialog-copy">Paste your deployed Google Apps Script web app URL to sync entries automatically.</p>
       <label>Apps Script URL<input id="endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec"></label>
       <button class="primary-button" value="default" type="submit">Save connection</button>
+
+      <p class="eyebrow">PEOPLE</p><h2>Manage names</h2>
+      <p class="dialog-copy">Add someone new, or hide someone you no longer split money with. Their past entries stay in the Sheet either way.</p>
+      <div class="add-person-row">
+        <input id="newPersonName" type="text" placeholder="Add a name">
+        <button class="primary-button" id="addPersonButton" type="button">Add</button>
+      </div>
+      <div class="manage-people-list" id="managePeopleList"><small class="dialog-copy">Loading...</small></div>
+
       <button class="danger-button" id="exportButton" type="button">Export local entries</button>
     </form>
   </dialog>

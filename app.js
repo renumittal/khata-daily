@@ -33,25 +33,27 @@ function formatDate(value) { return new Date(`${value}T00:00:00`).toLocaleDateSt
 function showToast(message) { const toast = $('toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2600); }
 function setSyncState(online) { $('syncStatus').classList.toggle('online', online); $('syncStatus').innerHTML = `<i></i> ${online ? 'Connected' : 'Local'}`; }
 
-function syncEntry(entry) {
+function jsonpRequest(params, timeoutMs = 12000) {
   const endpoint = localStorage.getItem(ENDPOINT_KEY) || DEFAULT_ENDPOINT;
-  if (!endpoint) return Promise.resolve(false);
+  if (!endpoint) return Promise.resolve(null);
   return new Promise((resolve) => {
-    const callbackName = `khataSave${Date.now()}${Math.random().toString(36).slice(2)}`;
+    const callbackName = `khataCb${Date.now()}${Math.random().toString(36).slice(2)}`;
     const cleanup = () => { delete window[callbackName]; script.remove(); };
-    const timer = setTimeout(() => { cleanup(); setSyncState(false); resolve(false); }, 12000);
-    window[callbackName] = (response) => {
-      clearTimeout(timer); cleanup();
-      const ok = Boolean(response && response.ok);
-      setSyncState(ok);
-      resolve(ok);
-    };
-    const params = new URLSearchParams({ action:'save', callback:callbackName, id:entry.id, date:entry.date, type:entry.type, person:entry.person, category:entry.category || '', amount:String(entry.amount), note:entry.note || '', createdAt:entry.createdAt });
+    const timer = setTimeout(() => { cleanup(); resolve(null); }, timeoutMs);
+    window[callbackName] = (response) => { clearTimeout(timer); cleanup(); resolve(response); };
+    const search = new URLSearchParams({ ...params, callback: callbackName });
     const script = document.createElement('script');
-    script.src = `${endpoint}${endpoint.includes('?') ? '&' : '?'}${params.toString()}`;
-    script.onerror = () => { clearTimeout(timer); cleanup(); setSyncState(false); resolve(false); };
+    script.src = `${endpoint}${endpoint.includes('?') ? '&' : '?'}${search.toString()}`;
+    script.onerror = () => { clearTimeout(timer); cleanup(); resolve(null); };
     document.body.appendChild(script);
   });
+}
+
+async function syncEntry(entry) {
+  const response = await jsonpRequest({ action:'save', id:entry.id, date:entry.date, type:entry.type, person:entry.person, category:entry.category || '', amount:String(entry.amount), note:entry.note || '', createdAt:entry.createdAt });
+  const ok = Boolean(response && response.ok);
+  setSyncState(ok);
+  return ok;
 }
 
 function renderPeople() {
@@ -65,25 +67,54 @@ function renderPeople() {
         <input class="person-date" type="date" value="${today()}" required>
         <input class="person-purpose" type="text" placeholder="Purpose (optional)">
       </div>
-    </div>`).join('') : '<div class="people-placeholder">Add names in Sheet1 column A.</div>';
+    </div>`).join('') : '<div class="people-placeholder">Add names from Settings → Manage names.</div>';
   $('peopleStatus').textContent = people.length ? `${people.length} people` : 'No names found';
 }
 
-function loadPeople() {
-  const endpoint = localStorage.getItem(ENDPOINT_KEY) || DEFAULT_ENDPOINT;
-  if (!endpoint) return;
-  const callbackName = `khataPeople${Date.now()}`;
-  window[callbackName] = (response) => {
-    people = response.people || [];
-    renderPeople();
-    setSyncState(true);
-    delete window[callbackName];
-    script.remove();
-  };
-  const script = document.createElement('script');
-  script.src = `${endpoint}${endpoint.includes('?') ? '&' : '?'}callback=${callbackName}`;
-  script.onerror = () => { $('peopleStatus').textContent = 'Check Apps Script access'; showToast('Redeploy Apps Script as Anyone, then refresh'); setSyncState(false); delete window[callbackName]; script.remove(); };
-  document.body.appendChild(script);
+async function loadPeople() {
+  const response = await jsonpRequest({});
+  if (!response) {
+    $('peopleStatus').textContent = 'Check Apps Script access';
+    showToast('Redeploy Apps Script as Anyone, then refresh');
+    setSyncState(false);
+    return;
+  }
+  people = response.people || [];
+  renderPeople();
+  setSyncState(true);
+}
+
+function renderManagePeople(list) {
+  $('managePeopleList').innerHTML = list.length ? list.map((entry) => `
+    <div class="manage-person-row">
+      <span>${escapeHtml(entry.name)}</span>
+      <button type="button" class="status-toggle${entry.active ? ' active' : ''}" data-name="${escapeHtml(entry.name)}" data-active="${entry.active}">${entry.active ? 'Active' : 'Inactive'}</button>
+    </div>`).join('') : '<small class="dialog-copy">No names yet — add one above.</small>';
+}
+
+async function loadAllPeople() {
+  $('managePeopleList').innerHTML = '<small class="dialog-copy">Loading...</small>';
+  const response = await jsonpRequest({ action:'allPeople' });
+  if (!response) { $('managePeopleList').innerHTML = '<small class="dialog-copy">Could not load — check Apps Script access.</small>'; return; }
+  renderManagePeople(response.people || []);
+}
+
+async function addPerson() {
+  const name = $('newPersonName').value.trim();
+  if (!name) return;
+  $('addPersonButton').disabled = true;
+  const response = await jsonpRequest({ action:'addPerson', name });
+  $('addPersonButton').disabled = false;
+  if (!response || !response.ok) { showToast('Could not add name'); return; }
+  $('newPersonName').value = '';
+  showToast(`${name} added`);
+  await Promise.all([loadAllPeople(), loadPeople()]);
+}
+
+async function setPersonActive(name, active) {
+  const response = await jsonpRequest({ action:'setActive', name, active:String(active) });
+  if (!response || !response.ok) { showToast('Could not update'); return; }
+  await Promise.all([loadAllPeople(), loadPeople()]);
 }
 
 function setTransactionType(type) {
@@ -113,8 +144,15 @@ $('entryForm').addEventListener('submit', async (event) => {
   const results = await Promise.all(newEntries.map(syncEntry)); showToast(results.every(Boolean) ? 'Saved and synced to Google Sheet' : 'Saved on this phone');
 });
 $('clearFilter').addEventListener('click', () => { showingAll = !showingAll; render(); });
-$('settingsButton').addEventListener('click', () => { $('endpoint').value = localStorage.getItem(ENDPOINT_KEY) || ''; $('settingsDialog').showModal(); });
+$('settingsButton').addEventListener('click', () => { $('endpoint').value = localStorage.getItem(ENDPOINT_KEY) || ''; $('settingsDialog').showModal(); loadAllPeople(); });
 $('settingsForm').addEventListener('submit', (event) => { event.preventDefault(); localStorage.setItem(ENDPOINT_KEY, $('endpoint').value.trim()); $('settingsDialog').close(); showToast('Connection saved, checking...'); loadPeople(); });
+$('addPersonButton').addEventListener('click', addPerson);
+$('newPersonName').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addPerson(); } });
+$('managePeopleList').addEventListener('click', (event) => {
+  const button = event.target.closest('.status-toggle');
+  if (!button) return;
+  setPersonActive(button.dataset.name, button.dataset.active !== 'true');
+});
 $('exportButton').addEventListener('click', () => { const blob = new Blob([JSON.stringify(entries, null, 2)], { type:'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `khata-daily-${today()}.json`; link.click(); URL.revokeObjectURL(link.href); });
 render();
 loadPeople();

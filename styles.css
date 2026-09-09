@@ -512,6 +512,65 @@ dialog::backdrop {
     margin: 0 0 20px;
 }
 
+.add-person-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.add-person-row input {
+    flex: 1;
+    margin: 0;
+}
+
+.add-person-row button {
+    width: auto;
+    padding: 0 18px;
+    margin: 0;
+}
+
+.manage-people-list {
+    display: grid;
+    gap: 6px;
+    max-height: 220px;
+    overflow: auto;
+    margin-bottom: 10px;
+}
+
+.manage-person-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+    color: var(--ink);
+}
+
+.manage-person-row span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.status-toggle {
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--muted);
+    border-radius: 30px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.status-toggle.active {
+    background: var(--green-soft);
+    color: var(--green);
+    border-color: var(--green-soft);
+}
+
 .close-button {
     position: absolute;
     right: 10px;
