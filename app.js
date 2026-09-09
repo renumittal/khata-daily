@@ -56,7 +56,16 @@ function syncEntry(entry) {
 
 function renderPeople() {
   $('peopleList').innerHTML = people.length ? people.map((person) => `
-    <label class="person-row"><span>${escapeHtml(person)}</span><input class="person-amount" data-person="${escapeHtml(person)}" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount"></label>`).join('') : '<div class="people-placeholder">Add names in Sheet1 column A.</div>';
+    <div class="person-card" data-person="${escapeHtml(person)}">
+      <div class="person-card-top">
+        <span>${escapeHtml(person)}</span>
+        <input class="person-amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount">
+      </div>
+      <div class="person-card-fields">
+        <input class="person-date" type="date" value="${today()}" required>
+        <input class="person-purpose" type="text" placeholder="Purpose (optional)">
+      </div>
+    </div>`).join('') : '<div class="people-placeholder">Add names in Sheet1 column A.</div>';
   $('peopleStatus').textContent = people.length ? `${people.length} people` : 'No names found';
 }
 
@@ -86,14 +95,21 @@ function setTransactionType(type) {
 $('creditButton').addEventListener('click', () => setTransactionType('credit'));
 $('debitButton').addEventListener('click', () => setTransactionType('debit'));
 
-$('date').value = today();
 $('entryForm').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const amounts = [...document.querySelectorAll('.person-amount')].filter((input) => Number(input.value) > 0);
-  if (!amounts.length) { showToast('Enter an amount for at least one person'); return; }
-  const common = { type:transactionType, category:'', date:$('date').value, note:$('note').value.trim(), createdAt:new Date().toISOString() };
-  const newEntries = amounts.map((input) => ({ ...common, id:crypto.randomUUID(), person:input.dataset.person, amount:Number(input.value) }));
-  entries.push(...newEntries); localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); render(); event.target.reset(); $('date').value = today(); setTransactionType('credit'); renderPeople();
+  const cards = [...document.querySelectorAll('.person-card')].filter((card) => Number(card.querySelector('.person-amount').value) > 0);
+  if (!cards.length) { showToast('Enter an amount for at least one person'); return; }
+  const newEntries = cards.map((card) => ({
+    id:crypto.randomUUID(),
+    type:transactionType,
+    category:'',
+    person:card.dataset.person,
+    amount:Number(card.querySelector('.person-amount').value),
+    date:card.querySelector('.person-date').value || today(),
+    note:card.querySelector('.person-purpose').value.trim(),
+    createdAt:new Date().toISOString(),
+  }));
+  entries.push(...newEntries); localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); render(); setTransactionType('credit'); renderPeople();
   const results = await Promise.all(newEntries.map(syncEntry)); showToast(results.every(Boolean) ? 'Saved and synced to Google Sheet' : 'Saved on this phone');
 });
 $('clearFilter').addEventListener('click', () => { showingAll = !showingAll; render(); });

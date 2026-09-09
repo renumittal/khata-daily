@@ -302,35 +302,54 @@ select:disabled {
 
 .people-list {
     display: grid;
-    gap: 6px;
+    gap: 10px;
     margin-bottom: 16px;
-    max-height: 280px;
+    max-height: 420px;
     overflow: auto;
 }
 
-.person-row {
+.person-card {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px;
+    background: rgba(255,253,249,.6);
+}
+
+.person-card-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin: 0;
-    padding: 7px 0 7px 10px;
-    border-bottom: 1px solid var(--line);
     color: var(--ink);
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 700;
 }
 
-.person-row span {
+.person-card-top span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.person-row input {
-    width: 130px;
+.person-card-top input {
+    width: 120px;
     margin: 0;
     padding: 9px 10px;
     text-align: right;
+    font-weight: 400;
+}
+
+.person-card-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.person-card-fields input {
+    margin: 0;
+    padding: 8px 9px;
+    font-size: 12px;
 }
 
 .people-placeholder {
