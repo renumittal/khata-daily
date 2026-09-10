@@ -22,6 +22,10 @@ function formatMonth(yyyyMm) {
   if (!y || !m) return yyyyMm;
   return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 }
+// Only accepts the <input type=month> format (YYYY-MM); older free-text values
+// (e.g. "Jun-26" from before Start month became a date picker) return null rather
+// than NaN, so the UI can show "—" instead of a broken number.
+function isYYYYMM(value) { return /^\d{4}-\d{2}$/.test(value || ''); }
 function monthsBetween(fromYYYYMM, toYYYYMM) {
   const [fy, fm] = fromYYYYMM.split('-').map(Number);
   const [ty, tm] = toYYYYMM.split('-').map(Number);
@@ -29,7 +33,7 @@ function monthsBetween(fromYYYYMM, toYYYYMM) {
 }
 // 1-based position of targetYYYYMM within the committee's timeline (start month = 1).
 function monthIndexFor(committee, targetYYYYMM) {
-  if (!committee || !committee.startMonth || !targetYYYYMM) return null;
+  if (!committee || !isYYYYMM(committee.startMonth) || !isYYYYMM(targetYYYYMM)) return null;
   return monthsBetween(committee.startMonth, targetYYYYMM) + 1;
 }
 function committeeByNo(no) { return committees.find((c) => c.no === no); }
@@ -237,6 +241,7 @@ function populateCommitteeSelect(preselectNo) {
   selectedCommitteeNo = sel.value || null;
   $('m_month').value = currentYYYYMM();
   $('m_ghata').value = '';
+  renderCommitteeInfo();
   loadCommitteeInstalments();
   loadCommitteeMonths();
 }
@@ -257,11 +262,22 @@ async function loadCommitteeMonths() {
   updateMonthPreview();
 }
 
+function renderCommitteeInfo() {
+  const committee = committeeByNo(selectedCommitteeNo);
+  $('m_committeeInfo').textContent = committee
+    ? `Committee #${committee.no}: ${committee.totalMembers} members, ${currency(committee.monthlyAmount)}/month, total pot ${currency(committee.totalAmount)}.`
+    : 'Pick a committee to see its details.';
+}
+
 function updateMonthPreview() {
   const committee = committeeByNo(selectedCommitteeNo);
-  const kist = kistFor(committee, $('m_ghata').value);
+  const ghata = Number($('m_ghata').value) || 0;
+  const kist = kistFor(committee, ghata);
   $('m_kistPreview').textContent = currency(kist);
   $('m_kistTotal').textContent = currency(kist * (committee ? committee.totalMembers : 0));
+  $('m_formula').textContent = committee
+    ? `${currency(committee.monthlyAmount)} − (${currency(ghata)} ÷ ${committee.totalMembers} members) = ${currency(kist)} per member`
+    : 'KIST = Monthly amount − (GHATA ÷ members)';
 }
 
 async function saveCommitteeMonth() {
@@ -541,6 +557,7 @@ $('instCommitteeSelect').addEventListener('change', (event) => {
   selectedCommitteeNo = event.target.value || null;
   $('m_month').value = currentYYYYMM();
   $('m_ghata').value = '';
+  renderCommitteeInfo();
   loadCommitteeInstalments();
   loadCommitteeMonths();
 });

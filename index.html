@@ -138,11 +138,13 @@
         <div class="section-heading compact">
           <div><p class="eyebrow">THIS MONTH</p><h2 style="font-size:15px;margin:0;">Boli / GHATA</h2></div>
         </div>
-        <p class="dialog-copy">Enter the month's auction discount once — KIST for every member is worked out from it and saved to their rows.</p>
+        <p class="dialog-copy" id="m_committeeInfo">Loading committee details…</p>
+        <p class="dialog-copy">Enter the month's auction discount (the amount the winning bidder gives up) once — KIST for every member is worked out from it and saved to their rows.</p>
         <div class="field-row">
           <label>Month<input id="m_month" type="month"></label>
           <label>GHATA (₹)<input id="m_ghata" type="number" min="0"></label>
         </div>
+        <p class="dialog-copy" id="m_formula">KIST = Monthly amount − (GHATA ÷ members)</p>
         <div class="stat-row">
           <div class="stat-box"><small>KIST per member</small><strong id="m_kistPreview">₹0</strong></div>
           <div class="stat-box"><small>Total KIST this month</small><strong id="m_kistTotal">₹0</strong></div>
