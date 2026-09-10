@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'khata-daily-entries';
 const ENDPOINT_KEY = 'khata-daily-endpoint';
-const DEFAULT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwoSVEQ7aqWTrrPN3Bz1tvfJG05LweLtw8X8QcawHJbnUuBwGTFL3ybKTj4eEECUvC5tw/exec';
+const DEFAULT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxtJtyY1DnAwUXSQyKFiOGiMHZDuHZufY56SCplgJoat-huT1CR0PF4YPPzS6cv0i9Ckw/exec';
 let entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 let showingAll = false;
 let people = [];
