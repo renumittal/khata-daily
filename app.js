@@ -499,20 +499,35 @@ $('committeeList').addEventListener('click', (event) => {
   if (!row) return;
   switchCommitteeSub('instalments', row.dataset.no);
 });
+// A committee pays out to one member per month, so months = members; the total
+// pot one member receives (before any boli discount) is members × monthly amount.
+function updateCommitteePreview() {
+  const members = Number($('c_members').value) || 0;
+  const monthly = Number($('c_monthly').value) || 0;
+  $('c_preview').textContent = members
+    ? `${members} months · Total pot ${currency(members * monthly)}`
+    : 'A committee runs one month per member, so months and total pot are worked out automatically.';
+}
+$('c_members').addEventListener('input', updateCommitteePreview);
+$('c_monthly').addEventListener('input', updateCommitteePreview);
+
 $('committeeForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const no = $('c_no').value.trim();
   if (!no) { showToast('Committee No is required'); return; }
+  const totalMembers = Number($('c_members').value) || 0;
+  const monthlyAmount = Number($('c_monthly').value) || 0;
   const response = await committeeRequest({
     action: 'addCommittee', no,
-    totalMembers: $('c_members').value, totalMonths: $('c_months').value,
-    monthlyAmount: $('c_monthly').value, totalAmount: $('c_total').value,
-    cutPercent: $('c_cut').value, extraProfit: $('c_extraprofit').value,
+    totalMembers, totalMonths: totalMembers,
+    monthlyAmount, totalAmount: totalMembers * monthlyAmount,
+    cutPercent: $('c_cut').value,
     startMonth: $('c_start').value, status: $('c_status').value,
   });
   if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
   showToast('Committee saved');
   event.target.reset();
+  updateCommitteePreview();
   switchCommitteeSub('list');
   loadCommittees();
 });
