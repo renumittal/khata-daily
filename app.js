@@ -259,7 +259,9 @@ async function loadCommitteeMonths() {
 
 function updateMonthPreview() {
   const committee = committeeByNo(selectedCommitteeNo);
-  $('m_kistPreview').textContent = currency(kistFor(committee, $('m_ghata').value));
+  const kist = kistFor(committee, $('m_ghata').value);
+  $('m_kistPreview').textContent = currency(kist);
+  $('m_kistTotal').textContent = currency(kist * (committee ? committee.totalMembers : 0));
 }
 
 async function saveCommitteeMonth() {
