@@ -1,6 +1,9 @@
 const SPREADSHEET_ID = '1GiL6u7h5uzf1IkL_1XYQQCxXROmyizHPMGhwU2RabIM';
 const PEOPLE_SHEET_NAME = 'People';
 const TRANSACTIONS_SHEET_NAME = 'Detail Transaction';
+const COMMITTEES_SHEET_NAME = 'Committees';
+const COMMITTEE_INSTALMENTS_SHEET_NAME = 'Committee Instalments';
+const COMMITTEE_MONTHS_SHEET_NAME = 'Committee Months';
 
 function getSpreadsheet() {
   return SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -180,6 +183,45 @@ function doGet(e) {
   if (params.action === 'allPeople') {
     const rows = readPeopleRows().sort((a, b) => a.name.localeCompare(b.name));
     return respond(e, { ok: true, people: rows.map((entry) => ({ name: entry.name, active: entry.active })) });
+  }
+
+  if (params.action === 'committees') {
+    return respond(e, { ok: true, committees: readCommittees_() });
+  }
+
+  if (params.action === 'addCommittee') {
+    try {
+      addCommittee_(params);
+      return respond(e, { ok: true });
+    } catch (error) {
+      return respond(e, { ok: false, error: String(error) });
+    }
+  }
+
+  if (params.action === 'committeeInstalments') {
+    return respond(e, { ok: true, instalments: readCommitteeInstalments_(params.no) });
+  }
+
+  if (params.action === 'saveCommitteeInstalment') {
+    try {
+      saveCommitteeInstalment_(params);
+      return respond(e, { ok: true });
+    } catch (error) {
+      return respond(e, { ok: false, error: String(error) });
+    }
+  }
+
+  if (params.action === 'committeeMonths') {
+    return respond(e, { ok: true, months: readCommitteeMonths_(params.no) });
+  }
+
+  if (params.action === 'saveCommitteeMonth') {
+    try {
+      const result = saveCommitteeMonth_(params);
+      return respond(e, result);
+    } catch (error) {
+      return respond(e, { ok: false, error: String(error) });
+    }
   }
 
   const people = [...new Set(readPeopleRows().filter((entry) => entry.active).map((entry) => entry.name))].sort();

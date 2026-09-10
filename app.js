@@ -9,6 +9,50 @@ let selectedPerson = null;
 let personFilter = 'all';
 let remoteTransactions = [];
 let pendingVerification = [];
+let committees = [];
+let committeeInstalments = [];
+let committeeMonths = [];
+let selectedCommitteeNo = null;
+let committeeSub = 'list';
+
+function currentYYYYMM() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+function formatMonth(yyyyMm) {
+  if (!yyyyMm) return '';
+  const [y, m] = yyyyMm.split('-').map(Number);
+  if (!y || !m) return yyyyMm;
+  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+}
+function monthsBetween(fromYYYYMM, toYYYYMM) {
+  const [fy, fm] = fromYYYYMM.split('-').map(Number);
+  const [ty, tm] = toYYYYMM.split('-').map(Number);
+  return (ty - fy) * 12 + (tm - fm);
+}
+// 1-based position of targetYYYYMM within the committee's timeline (start month = 1).
+function monthIndexFor(committee, targetYYYYMM) {
+  if (!committee || !committee.startMonth || !targetYYYYMM) return null;
+  return monthsBetween(committee.startMonth, targetYYYYMM) + 1;
+}
+function committeeByNo(no) { return committees.find((c) => c.no === no); }
+function pendingMonthsFor(committee) {
+  if (!committee || !committee.totalMonths) return '';
+  const idx = monthIndexFor(committee, currentYYYYMM());
+  if (idx === null) return '';
+  return Math.max(0, Math.min(committee.totalMonths, committee.totalMonths - idx));
+}
+// Matches the sample sheet: MonthlyAmount − MonthlyAmount×(Cut%)×(TotalMonths − month-taken index).
+function sarkariFor(committee, row) {
+  if (!committee || !row.takenMonth) return '';
+  const idx = monthIndexFor(committee, row.takenMonth);
+  if (idx === null) return '';
+  const cut = (Number(committee.cutPercent) || 0) / 100;
+  return Math.round(committee.monthlyAmount - committee.monthlyAmount * cut * (committee.totalMonths - idx));
+}
+// KIST for a member this month = MonthlyAmount − (GHATA ÷ TotalMembers), the boli discount split evenly.
+function kistFor(committee, ghata) {
+  if (!committee) return 0;
+  if (!committee.totalMembers) return committee.monthlyAmount;
+  return Math.round(committee.monthlyAmount - (Number(ghata) || 0) / committee.totalMembers);
+}
 
 function allEntries() {
   const map = new Map();
@@ -40,8 +84,8 @@ function formatDate(value) { return new Date(`${value}T00:00:00`).toLocaleDateSt
 function showToast(message) { const toast = $('toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2600); }
 function setSyncState(online) { $('syncStatus').classList.toggle('online', online); $('syncStatus').innerHTML = `<i></i> ${online ? 'Connected' : 'Local'}`; }
 
-function jsonpRequest(params, timeoutMs = 12000) {
-  const endpoint = localStorage.getItem(ENDPOINT_KEY) || DEFAULT_ENDPOINT;
+function jsonpRequest(params, timeoutMs = 12000, endpointOverride) {
+  const endpoint = endpointOverride || localStorage.getItem(ENDPOINT_KEY) || DEFAULT_ENDPOINT;
   if (!endpoint) return Promise.resolve(null);
   return new Promise((resolve) => {
     const callbackName = `khataCb${Date.now()}${Math.random().toString(36).slice(2)}`;
@@ -54,6 +98,10 @@ function jsonpRequest(params, timeoutMs = 12000) {
     script.onerror = () => { clearTimeout(timer); cleanup(); resolve(null); };
     document.body.appendChild(script);
   });
+}
+
+function committeeRequest(params, timeoutMs = 12000) {
+  return jsonpRequest(params, timeoutMs);
 }
 
 async function syncEntry(entry) {
@@ -144,10 +192,138 @@ function switchView(view) {
   $('peopleView').hidden = view !== 'people';
   $('verifyView').hidden = view !== 'verify';
   $('personDetailView').hidden = view !== 'personDetail';
+  $('committeeView').hidden = view !== 'committee';
   document.querySelectorAll('.tab-button[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view || (view === 'personDetail' && button.dataset.view === 'people')));
   if (view === 'people') { renderPeopleDirectory(); loadTransactions().then(() => { if (!$('peopleView').hidden) renderPeopleDirectory(); }); }
   if (view === 'personDetail') renderPersonDetail();
   if (view === 'verify') loadUnverified();
+  if (view === 'committee') loadCommittees();
+}
+
+function switchCommitteeSub(sub, preselectNo) {
+  committeeSub = sub;
+  ['list', 'add', 'instalments'].forEach((name) => { $(`committeeSub-${name}`).hidden = name !== sub; });
+  document.querySelectorAll('.type-switch [data-csub]').forEach((button) => button.classList.toggle('active', button.dataset.csub === sub));
+  if (sub === 'instalments') populateCommitteeSelect(preselectNo || selectedCommitteeNo);
+}
+
+async function loadCommittees() {
+  $('committeeList').innerHTML = '';
+  const response = await committeeRequest({ action: 'committees' });
+  if (!response || !response.ok) { $('committeeEmpty').hidden = false; $('committeeEmpty').querySelector('p').textContent = 'Could not load'; return; }
+  committees = response.committees || [];
+  renderCommittees();
+  if (committeeSub === 'instalments') populateCommitteeSelect(selectedCommitteeNo);
+}
+
+function renderCommittees() {
+  $('committeeEmpty').hidden = committees.length > 0;
+  $('committeeEmpty').querySelector('p').textContent = 'No committees yet';
+  $('committeeList').innerHTML = committees.map((c) => `
+    <div class="person-summary-row committee-row" data-no="${escapeHtml(c.no)}">
+      <div class="person-avatar">${escapeHtml(c.no)}</div>
+      <div class="person-summary-main">
+        <div class="person-summary-name">Committee #${escapeHtml(c.no)}</div>
+        <div class="person-summary-meta">${c.totalMembers} members · ${c.totalMonths} months · ${currency(c.monthlyAmount)}/month${c.startMonth ? ` · from ${escapeHtml(formatMonth(c.startMonth))}` : ''}</div>
+      </div>
+      <div class="person-summary-balance ${c.status === 'Closed' ? 'owing' : 'owed'}"><small>${escapeHtml(c.status || 'Running')}</small></div>
+    </div>`).join('');
+}
+
+function populateCommitteeSelect(preselectNo) {
+  const sel = $('instCommitteeSelect');
+  sel.innerHTML = committees.map((c) => `<option value="${escapeHtml(c.no)}">Committee #${escapeHtml(c.no)}</option>`).join('');
+  if (preselectNo) sel.value = preselectNo;
+  selectedCommitteeNo = sel.value || null;
+  $('m_month').value = currentYYYYMM();
+  $('m_ghata').value = '';
+  loadCommitteeInstalments();
+  loadCommitteeMonths();
+}
+
+async function loadCommitteeInstalments() {
+  if (!selectedCommitteeNo) { committeeInstalments = []; renderCommitteeInstalments(); return; }
+  const response = await committeeRequest({ action: 'committeeInstalments', no: selectedCommitteeNo });
+  committeeInstalments = (response && response.instalments) || [];
+  renderCommitteeInstalments();
+}
+
+async function loadCommitteeMonths() {
+  if (!selectedCommitteeNo) { committeeMonths = []; updateMonthPreview(); return; }
+  const response = await committeeRequest({ action: 'committeeMonths', no: selectedCommitteeNo });
+  committeeMonths = (response && response.months) || [];
+  const existing = committeeMonths.find((m) => m.month === $('m_month').value);
+  $('m_ghata').value = existing ? existing.ghata : '';
+  updateMonthPreview();
+}
+
+function updateMonthPreview() {
+  const committee = committeeByNo(selectedCommitteeNo);
+  $('m_kistPreview').textContent = currency(kistFor(committee, $('m_ghata').value));
+}
+
+async function saveCommitteeMonth() {
+  const no = selectedCommitteeNo;
+  const month = $('m_month').value;
+  if (!no || !month) { showToast('Pick a committee and month'); return; }
+  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata: $('m_ghata').value });
+  if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
+  showToast(`KIST set to ${currency(response.kist)} for every member`);
+  await Promise.all([loadCommitteeMonths(), loadCommitteeInstalments()]);
+}
+
+function renderCommitteeInstalments() {
+  const committee = committeeByNo(selectedCommitteeNo);
+  $('instList').innerHTML = committeeInstalments.map((r, i) => {
+    const sarkari = sarkariFor(committee, r);
+    return `
+    <div class="verify-card" data-index="${i}">
+      <div class="verify-fields">
+        <div class="verify-row">
+          <input class="inst-person" type="text" placeholder="Person" value="${escapeHtml(r.person || '')}">
+          <select class="inst-isTaken">
+            <option ${r.isTaken === 'No' ? 'selected' : ''}>No</option>
+            <option ${r.isTaken === 'Yes' ? 'selected' : ''}>Yes</option>
+          </select>
+        </div>
+        <div class="verify-row">
+          <input class="inst-amount" type="number" placeholder="Amount" value="${r.amount || ''}">
+          <input class="inst-takenMonth" type="month" value="${escapeHtml(r.takenMonth || '')}">
+        </div>
+        <div class="person-summary-meta">KIST ${currency(r.kist || 0)} · GHATA ${currency(r.ghata || 0)} <small>(set from "This month" above)</small></div>
+        <div class="person-summary-meta">Sarkari (auto) ${sarkari !== '' ? currency(sarkari) : '— set taken month first'}</div>
+        <input class="inst-status" type="text" placeholder="Status (e.g. Not taken)" value="${escapeHtml(r.status || '')}">
+        <button class="text-button inst-save" type="button">Save row</button>
+      </div>
+    </div>`;
+  }).join('');
+  const pending = pendingMonthsFor(committee);
+  $('sumPending').textContent = pending === '' ? '—' : pending;
+  $('sumTaken').textContent = committeeInstalments.filter((r) => r.isTaken === 'Yes').length;
+}
+
+async function saveInstalmentRow(index) {
+  const card = document.querySelector(`#instList .verify-card[data-index="${index}"]`);
+  const existingRow = committeeInstalments[index];
+  const committee = committeeByNo(selectedCommitteeNo);
+  const takenMonth = card.querySelector('.inst-takenMonth').value;
+  const row = {
+    no: selectedCommitteeNo,
+    person: card.querySelector('.inst-person').value.trim(),
+    isTaken: card.querySelector('.inst-isTaken').value,
+    amount: card.querySelector('.inst-amount').value,
+    takenMonth,
+    kist: existingRow.kist,
+    ghata: existingRow.ghata,
+    sarkari: sarkariFor(committee, { takenMonth }),
+    status: card.querySelector('.inst-status').value,
+    pendingMonth: pendingMonthsFor(committee),
+  };
+  if (!row.person) { showToast('Person name is required'); return; }
+  const response = await committeeRequest({ action: 'saveCommitteeInstalment', ...row });
+  if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
+  showToast('Saved');
+  loadCommitteeInstalments();
 }
 
 function renderVerifyList() {
@@ -317,6 +493,48 @@ $('personAddEntryButton').addEventListener('click', () => {
   if (card) { card.scrollIntoView({ behavior:'smooth', block:'center' }); card.querySelector('.person-amount').focus(); }
 });
 $('settingsForm').addEventListener('submit', (event) => { event.preventDefault(); localStorage.setItem(ENDPOINT_KEY, $('endpoint').value.trim()); $('settingsDialog').close(); showToast('Connection saved, checking...'); loadPeople(); });
+document.querySelectorAll('.type-switch [data-csub]').forEach((button) => button.addEventListener('click', () => switchCommitteeSub(button.dataset.csub)));
+$('committeeList').addEventListener('click', (event) => {
+  const row = event.target.closest('.committee-row');
+  if (!row) return;
+  switchCommitteeSub('instalments', row.dataset.no);
+});
+$('committeeForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const no = $('c_no').value.trim();
+  if (!no) { showToast('Committee No is required'); return; }
+  const response = await committeeRequest({
+    action: 'addCommittee', no,
+    totalMembers: $('c_members').value, totalMonths: $('c_months').value,
+    monthlyAmount: $('c_monthly').value, totalAmount: $('c_total').value,
+    cutPercent: $('c_cut').value, extraProfit: $('c_extraprofit').value,
+    startMonth: $('c_start').value, status: $('c_status').value,
+  });
+  if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
+  showToast('Committee saved');
+  event.target.reset();
+  switchCommitteeSub('list');
+  loadCommittees();
+});
+$('instCommitteeSelect').addEventListener('change', (event) => {
+  selectedCommitteeNo = event.target.value || null;
+  $('m_month').value = currentYYYYMM();
+  $('m_ghata').value = '';
+  loadCommitteeInstalments();
+  loadCommitteeMonths();
+});
+$('m_month').addEventListener('change', loadCommitteeMonths);
+$('m_ghata').addEventListener('input', updateMonthPreview);
+$('saveMonthButton').addEventListener('click', saveCommitteeMonth);
+$('addInstalmentRowButton').addEventListener('click', () => {
+  committeeInstalments.push({ person: '', isTaken: 'No', amount: '', takenMonth: '', kist: '', ghata: '', sarkari: '', status: '', pendingMonth: '' });
+  renderCommitteeInstalments();
+});
+$('instList').addEventListener('click', (event) => {
+  const button = event.target.closest('.inst-save');
+  if (!button) return;
+  saveInstalmentRow(Number(button.closest('.verify-card').dataset.index));
+});
 $('addPersonButton').addEventListener('click', addPerson);
 $('newPersonName').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addPerson(); } });
 $('managePeopleList').addEventListener('click', (event) => {

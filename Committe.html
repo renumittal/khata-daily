@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Committees — Khata Daily</title>
+<style>
+  :root{
+    --cream:#f5f1e8;
+    --ink:#2b2b28;
+    --green:#2f6b4f;
+    --green-dark:#234f3a;
+    --maroon:#a8382c;
+    --amber:#c99a3d;
+    --card:#ffffff;
+    --border:#e4ddcc;
+    --muted:#8a8478;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--cream);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:32px 20px 80px;}
+  header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;}
+  .eyebrow{font-size:12px;letter-spacing:.06em;color:var(--muted);margin:0 0 4px;}
+  h1{font-family:Georgia,"Times New Roman",serif;font-size:32px;margin:0;}
+  .back-link{font-size:13px;color:var(--green-dark);text-decoration:none;}
+  .tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:24px;}
+  .tab{flex:1;text-align:center;padding:10px 8px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--muted);}
+  .tab.active{background:var(--green);color:#fff;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  .cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;border-top:3px solid var(--green);}
+  .stat.maroon{border-top-color:var(--maroon);}
+  .stat.amber{border-top-color:var(--amber);}
+  .stat .label{font-size:13px;color:var(--muted);margin-bottom:6px;}
+  .stat .val{font-size:22px;font-weight:600;}
+  .section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px;}
+  .section h2{font-size:18px;margin:0 0 4px;}
+  .section .sub{font-size:13px;color:var(--muted);margin-bottom:18px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  label{font-size:13px;font-weight:600;display:block;margin-bottom:6px;}
+  input,select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:#fdfcf9;}
+  .field{margin-bottom:14px;}
+  button.primary{width:100%;background:var(--green);color:#fff;border:none;padding:14px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:6px;}
+  button.primary:hover{background:var(--green-dark);}
+  .table-scroll{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:760px;}
+  th{text-align:left;font-size:11.5px;color:var(--muted);padding:8px 6px;border-bottom:1px solid var(--border);white-space:nowrap;}
+  td{padding:6px;border-bottom:1px solid var(--border);}
+  td input,td select{padding:6px 8px;font-size:13px;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+  .pill.yes{background:#e4efe8;color:var(--green-dark);}
+  .pill.no{background:#f6e9e6;color:var(--maroon);}
+  .committee-card{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
+  .committee-card:hover{border-color:var(--green);}
+  .committee-card .name{font-weight:600;font-size:15px;}
+  .committee-card .meta{font-size:12px;color:var(--muted);}
+  select.wide{max-width:260px;}
+  .banner{background:#f6e9e6;color:var(--maroon);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;}
+  .banner.ok{background:#e4efe8;color:var(--green-dark);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="eyebrow">COMMITTEE MANAGER</p>
+      <h1>Kameti Tracker</h1>
+    </div>
+    <a class="back-link" href="index.html">← Khata Daily</a>
+  </header>
+
+  <div id="connectionBanner"></div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="list">Committees</div>
+    <div class="tab" data-tab="add">Add New</div>
+    <div class="tab" data-tab="instalments">Instalments</div>
+    <div class="tab" data-tab="settings">Connect</div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="panel" id="panel-settings">
+    <div class="section">
+      <h2>Google Sheet connection</h2>
+      <p class="sub">This is a separate Apps Script deployment from Khata Daily — see the setup notes at the top of CommitteBackend.gs. Paste the committee backend's own web app URL here.</p>
+      <div class="field">
+        <label>Apps Script URL</label>
+        <input id="s_endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <button class="primary" onclick="saveEndpoint()">Save connection</button>
+    </div>
+  </div>
+
+  <!-- LIST -->
+  <div class="panel active" id="panel-list">
+    <div class="section">
+      <h2>All committees</h2>
+      <p class="sub">Tap a committee to manage member instalments and GHATA.</p>
+      <div id="committeeList"></div>
+    </div>
+  </div>
+
+  <!-- ADD -->
+  <div class="panel" id="panel-add">
+    <div class="section">
+      <h2>New committee</h2>
+      <p class="sub">Creates a row in the Committees sheet. Members are added from the Instalments tab.</p>
+      <div class="grid3">
+        <div class="field"><label>Committee No (NO)</label><input id="c_no" type="text" placeholder="e.g. 1"></div>
+        <div class="field"><label>Total members</label><input id="c_members" type="number"></div>
+        <div class="field"><label>Total months</label><input id="c_months" type="number"></div>
+      </div>
+      <div class="grid3">
+        <div class="field"><label>Monthly amount (₹)</label><input id="c_monthly" type="number"></div>
+        <div class="field"><label>Total amount (₹)</label><input id="c_total" type="number"></div>
+        <div class="field"><label>Cut per month (%)</label><input id="c_cut" type="number" step="0.01"></div>
+      </div>
+      <div class="grid3">
+        <div class="field"><label>Extra profit</label><input id="c_extraprofit" type="number"></div>
+        <div class="field"><label>Start month</label><input id="c_start" type="text" placeholder="e.g. Jun-26"></div>
+        <div class="field"><label>Status</label>
+          <select id="c_status"><option>Running</option><option>Closed</option></select>
+        </div>
+      </div>
+      <button class="primary" onclick="saveCommittee()">+ Save committee</button>
+    </div>
+  </div>
+
+  <!-- INSTALMENTS -->
+  <div class="panel" id="panel-instalments">
+    <div class="section">
+      <h2>Member instalments</h2>
+      <div class="field">
+        <label>Committee</label>
+        <select id="instCommitteeSelect" class="wide" onchange="loadInstalments()"></select>
+      </div>
+      <div class="cards3">
+        <div class="stat"><div class="label">Total KIST collected</div><div class="val" id="sumKist">₹0</div></div>
+        <div class="stat maroon"><div class="label">Total GHATA (profit)</div><div class="val" id="sumGhata">₹0</div></div>
+        <div class="stat amber"><div class="label">Members taken</div><div class="val" id="sumTaken">0</div></div>
+      </div>
+      <div class="table-scroll">
+      <table id="instTable">
+        <thead>
+          <tr>
+            <th>Person</th><th>Is taken</th><th>Amount</th><th>Taken month</th>
+            <th>KIST</th><th>GHATA</th><th>Sarkari</th><th>Status</th><th>Pending month</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="instBody"></tbody>
+      </table>
+      </div>
+      <button class="primary" onclick="addInstalmentRow()">+ Add member row</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Committees now share the same Apps Script deployment as Khata Daily (see CommitteBackend.gs).
+const ENDPOINT_KEY = 'khata-daily-endpoint';
+const DEFAULT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwoSVEQ7aqWTrrPN3Bz1tvfJG05LweLtw8X8QcawHJbnUuBwGTFL3ybKTj4eEECUvC5tw/exec';
+
+let currentCommittees = [];
+let currentInstalments = [];
+
+function jsonpRequest(params, timeoutMs = 12000){
+  const endpoint = localStorage.getItem(ENDPOINT_KEY) || DEFAULT_ENDPOINT;
+  if (!endpoint) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const callbackName = `khataCommCb${Date.now()}${Math.random().toString(36).slice(2)}`;
+    const cleanup = () => { delete window[callbackName]; script.remove(); };
+    const timer = setTimeout(() => { cleanup(); resolve(null); }, timeoutMs);
+    window[callbackName] = (response) => { clearTimeout(timer); cleanup(); resolve(response); };
+    const search = new URLSearchParams({ ...params, callback: callbackName });
+    const script = document.createElement('script');
+    script.src = `${endpoint}${endpoint.includes('?') ? '&' : '?'}${search.toString()}`;
+    script.onerror = () => { clearTimeout(timer); cleanup(); resolve(null); };
+    document.body.appendChild(script);
+  });
+}
+
+function showBanner(){
+  const el = document.getElementById('connectionBanner');
+  const endpoint = localStorage.getItem(ENDPOINT_KEY) || DEFAULT_ENDPOINT;
+  if(!endpoint){
+    el.innerHTML = '<div class="banner">No Google Sheet connected yet — open the "Connect" tab and paste the committee backend\'s Apps Script URL (this is separate from Khata Daily\'s connection).</div>';
+  } else {
+    el.innerHTML = '';
+  }
+}
+function saveEndpoint(){
+  localStorage.setItem(ENDPOINT_KEY, document.getElementById('s_endpoint').value.trim());
+  showBanner();
+  alert('Connection saved.');
+  loadCommittees();
+}
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+    if(t.dataset.tab==='list') loadCommittees();
+    if(t.dataset.tab==='instalments') populateCommitteeSelect();
+    if(t.dataset.tab==='settings') document.getElementById('s_endpoint').value = localStorage.getItem(ENDPOINT_KEY) || DEFAULT_ENDPOINT;
+  });
+});
+
+async function loadCommittees(){
+  const el = document.getElementById('committeeList');
+  el.innerHTML = 'Loading…';
+  const data = await jsonpRequest({ action:'committees' });
+  if(!data || !data.ok){ el.innerHTML = '<p class="sub">Could not load. Check the connection in Khata Daily → Settings.</p>'; return; }
+  currentCommittees = data.committees || [];
+  el.innerHTML = currentCommittees.map(c=>`
+    <div class="committee-card" onclick="openCommittee('${c.no}')">
+      <div>
+        <div class="name">Committee #${c.no}</div>
+        <div class="meta">${c.totalMembers} members · ${c.totalMonths} months · ₹${c.monthlyAmount.toLocaleString('en-IN')}/month${c.startMonth ? ' · from '+c.startMonth : ''}</div>
+      </div>
+      <span class="pill ${c.status==='Running'?'yes':'no'}">${c.status||'Running'}</span>
+    </div>
+  `).join('') || '<p class="sub">No committees yet — add one from the "Add New" tab.</p>';
+}
+function openCommittee(no){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  document.querySelector('[data-tab="instalments"]').classList.add('active');
+  document.getElementById('panel-instalments').classList.add('active');
+  populateCommitteeSelect(no);
+}
+
+async function saveCommittee(){
+  const no = document.getElementById('c_no').value.trim();
+  if(!no){ alert('Committee No is required.'); return; }
+  const payload = {
+    action: 'addCommittee',
+    no,
+    totalMembers: document.getElementById('c_members').value,
+    totalMonths: document.getElementById('c_months').value,
+    monthlyAmount: document.getElementById('c_monthly').value,
+    totalAmount: document.getElementById('c_total').value,
+    cutPercent: document.getElementById('c_cut').value,
+    extraProfit: document.getElementById('c_extraprofit').value,
+    startMonth: document.getElementById('c_start').value,
+    status: document.getElementById('c_status').value
+  };
+  const res = await jsonpRequest(payload);
+  if(res && res.ok){ alert('Committee saved.'); document.querySelector('[data-tab="list"]').click(); }
+  else alert('Could not save — check the connection.');
+}
+
+function populateCommitteeSelect(selectNo){
+  const sel = document.getElementById('instCommitteeSelect');
+  sel.innerHTML = currentCommittees.map(c=>`<option value="${c.no}">Committee #${c.no}</option>`).join('');
+  if(selectNo) sel.value = selectNo;
+  loadInstalments();
+}
+
+async function loadInstalments(){
+  const no = document.getElementById('instCommitteeSelect').value;
+  if(!no) { currentInstalments = []; renderInstalments(); return; }
+  const data = await jsonpRequest({ action:'committeeInstalments', no });
+  currentInstalments = (data && data.instalments) || [];
+  renderInstalments();
+}
+function renderInstalments(){
+  document.getElementById('instBody').innerHTML = currentInstalments.map((r,i)=>`
+    <tr>
+      <td><input value="${r.person||''}" onblur="updateRow(${i},'person',this.value)"></td>
+      <td>
+        <select onchange="updateRow(${i},'isTaken',this.value)">
+          <option ${r.isTaken==='No'?'selected':''}>No</option>
+          <option ${r.isTaken==='Yes'?'selected':''}>Yes</option>
+        </select>
+      </td>
+      <td><input type="number" value="${r.amount||''}" onblur="updateRow(${i},'amount',this.value)"></td>
+      <td><input value="${r.takenMonth||''}" onblur="updateRow(${i},'takenMonth',this.value)"></td>
+      <td><input type="number" value="${r.kist||''}" onblur="updateRow(${i},'kist',this.value)"></td>
+      <td><input type="number" value="${r.ghata||''}" onblur="updateRow(${i},'ghata',this.value)"></td>
+      <td><input type="number" value="${r.sarkari||''}" onblur="updateRow(${i},'sarkari',this.value)"></td>
+      <td><input value="${r.status||''}" placeholder="e.g. Not taken" onblur="updateRow(${i},'status',this.value)"></td>
+      <td><input value="${r.pendingMonth||''}" onblur="updateRow(${i},'pendingMonth',this.value)"></td>
+      <td><button class="primary" style="width:auto;padding:6px 10px;margin:0;" onclick="saveRow(${i})">Save</button></td>
+    </tr>
+  `).join('');
+  updateSummary();
+}
+function updateSummary(){
+  const kist = currentInstalments.reduce((s,r)=>s+(Number(r.kist)||0),0);
+  const ghata = currentInstalments.reduce((s,r)=>s+(Number(r.ghata)||0),0);
+  const taken = currentInstalments.filter(r=>r.isTaken==='Yes').length;
+  document.getElementById('sumKist').textContent = '₹'+kist.toLocaleString('en-IN');
+  document.getElementById('sumGhata').textContent = '₹'+ghata.toLocaleString('en-IN');
+  document.getElementById('sumTaken').textContent = taken;
+}
+function updateRow(i, field, val){ currentInstalments[i][field] = val; if(field!=='person') updateSummary(); }
+function addInstalmentRow(){
+  currentInstalments.push({person:'',isTaken:'No',amount:'',takenMonth:'',kist:'',ghata:'',sarkari:'',status:'',pendingMonth:''});
+  renderInstalments();
+}
+async function saveRow(i){
+  const no = document.getElementById('instCommitteeSelect').value;
+  const r = currentInstalments[i];
+  if(!r.person || !r.person.trim()){ alert('Person name is required.'); return; }
+  const res = await jsonpRequest({ action:'saveCommitteeInstalment', no, person:r.person, isTaken:r.isTaken, amount:r.amount, takenMonth:r.takenMonth, kist:r.kist, ghata:r.ghata, sarkari:r.sarkari, status:r.status, pendingMonth:r.pendingMonth });
+  if(res && res.ok) loadInstalments();
+  else alert('Could not save — check the connection.');
+}
+
+showBanner();
+loadCommittees();
+</script>
+</body>
+</html>
+</content>

@@ -97,12 +97,78 @@
       <div class="empty-state" id="personTransactionEmpty" hidden><span>◎</span><p>No transactions</p><small>Nothing recorded for this person yet.</small></div>
       <button class="primary-button sticky-add" id="personAddEntryButton" type="button"><span>＋</span> Add entry</button>
     </section>
+
+    <section id="committeeView" class="view" hidden>
+      <div class="section-heading">
+        <div><p class="eyebrow">KAMETI</p><h2 class="view-title">Committees</h2></div>
+      </div>
+      <div class="type-switch" role="group" aria-label="Committee sections">
+        <button type="button" class="type-option active" data-csub="list">List</button>
+        <button type="button" class="type-option" data-csub="add">Add new</button>
+        <button type="button" class="type-option" data-csub="instalments">Instalments</button>
+      </div>
+
+      <div class="committee-sub" id="committeeSub-list">
+        <div class="people-directory" id="committeeList"></div>
+        <div class="empty-state" id="committeeEmpty" hidden><span>◈</span><p>No committees yet</p><small>Add one from &ldquo;Add new&rdquo;.</small></div>
+      </div>
+
+      <div class="committee-sub" id="committeeSub-add" hidden>
+        <form id="committeeForm">
+          <div class="field-row">
+            <label>Committee No (NO)<input id="c_no" type="text" placeholder="e.g. 1" required></label>
+            <label>Total members<input id="c_members" type="number"></label>
+          </div>
+          <div class="field-row">
+            <label>Total months<input id="c_months" type="number"></label>
+            <label>Monthly amount (₹)<input id="c_monthly" type="number"></label>
+          </div>
+          <div class="field-row">
+            <label>Total amount (₹)<input id="c_total" type="number"></label>
+            <label>Cut per month (%)<input id="c_cut" type="number" step="0.01"></label>
+          </div>
+          <div class="field-row">
+            <label>Extra profit<input id="c_extraprofit" type="number"></label>
+            <label>Start month<input id="c_start" type="month"></label>
+          </div>
+          <label>Status
+            <select id="c_status"><option>Running</option><option>Closed</option></select>
+          </label>
+          <button class="primary-button" type="submit"><span>＋</span> Save committee</button>
+        </form>
+      </div>
+
+      <div class="committee-sub" id="committeeSub-instalments" hidden>
+        <label>Committee<select id="instCommitteeSelect"></select></label>
+
+        <div class="section-heading compact">
+          <div><p class="eyebrow">THIS MONTH</p><h2 style="font-size:15px;margin:0;">Boli / GHATA</h2></div>
+        </div>
+        <p class="dialog-copy">Enter the month's auction discount once — KIST for every member is worked out from it and saved to their rows.</p>
+        <div class="field-row">
+          <label>Month<input id="m_month" type="month"></label>
+          <label>GHATA (₹)<input id="m_ghata" type="number" min="0"></label>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box"><small>KIST per member</small><strong id="m_kistPreview">₹0</strong></div>
+        </div>
+        <button class="primary-button" type="button" id="saveMonthButton">Save this month</button>
+
+        <div class="stat-row" style="margin-top:20px;">
+          <div class="stat-box"><small>Pending months</small><strong id="sumPending">—</strong></div>
+          <div class="stat-box"><small>Members taken</small><strong id="sumTaken">0</strong></div>
+        </div>
+        <div class="verify-list" id="instList"></div>
+        <button class="primary-button" type="button" id="addInstalmentRowButton"><span>＋</span> Add member row</button>
+      </div>
+    </section>
   </main>
 
   <nav class="tab-bar" aria-label="Sections">
     <button type="button" class="tab-button active" data-view="home"><span class="tab-icon">⌂</span>Home</button>
     <button type="button" class="tab-button" data-view="people"><span class="tab-icon">☰</span>People</button>
     <button type="button" class="tab-button" data-view="verify"><span class="tab-icon">✓</span>Verify<span class="tab-badge" id="verifyBadge" hidden>0</span></button>
+    <button type="button" class="tab-button" data-view="committee"><span class="tab-icon">◈</span>Committee</button>
     <button type="button" class="tab-button" id="settingsTabButton"><span class="tab-icon">⚙</span>Settings</button>
   </nav>
 
@@ -112,6 +178,7 @@
       <p class="eyebrow">CONNECTION</p><h2>Google Sheet</h2>
       <p class="dialog-copy">Paste your deployed Google Apps Script web app URL to sync entries automatically.</p>
       <label>Apps Script URL<input id="endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec"></label>
+      <p class="dialog-copy">This one connection covers both the ledger and Committees — CommitteBackend.gs shares this same deployment.</p>
       <button class="primary-button" value="default" type="submit">Save connection</button>
 
       <p class="eyebrow">PEOPLE</p><h2>Manage names</h2>

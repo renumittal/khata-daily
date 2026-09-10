@@ -877,6 +877,36 @@ dialog::backdrop {
     font-size: 13px;
 }
 
+.committee-sub {
+    margin-top: 14px;
+}
+
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(3,1fr);
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.stat-box {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+}
+
+.stat-box small {
+    display: block;
+    color: var(--muted);
+    font-size: 10.5px;
+    margin-bottom: 4px;
+}
+
+.stat-box strong {
+    font-size: 15px;
+}
+
 @media (max-width: 430px) {
     .app-shell {
         width:min(100% - 22px,620px);
