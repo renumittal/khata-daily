@@ -15,27 +15,11 @@
   <main class="app-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">PERSONAL LEDGER</p>
         <h1>Khata Daily</h1>
       </div>
     </header>
 
     <section id="homeView" class="view">
-      <section class="summary-grid" aria-label="Today's summary">
-        <article class="summary-card credit-card">
-          <span>Credit in</span>
-          <strong id="creditTotal">₹0</strong>
-        </article>
-        <article class="summary-card debit-card">
-          <span>Debit out</span>
-          <strong id="debitTotal">₹0</strong>
-        </article>
-        <article class="summary-card balance-card">
-          <span>Net today</span>
-          <strong id="netTotal">₹0</strong>
-        </article>
-      </section>
-
       <section class="entry-panel">
         <div class="section-heading">
           <div>
@@ -73,6 +57,20 @@
       <div class="empty-state" id="peopleDirectoryEmpty" hidden><span>◎</span><p>No people yet</p><small>Add names from Settings → Manage names.</small></div>
     </section>
 
+    <section id="verifyView" class="view" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">REVIEW</p>
+          <h2 class="view-title">Verify transactions</h2>
+        </div>
+        <small id="verifyCount" class="dialog-copy">0 pending</small>
+      </div>
+      <p class="dialog-copy">Correct anything that's off, then confirm. Verified entries won't show up here again.</p>
+      <div class="verify-list" id="verifyList"></div>
+      <div class="empty-state" id="verifyEmpty" hidden><span>✓</span><p>All caught up</p><small>Every transaction has been verified.</small></div>
+      <button class="primary-button sticky-add" id="verifySubmitButton" type="button">Verify selected</button>
+    </section>
+
     <section id="personDetailView" class="view" hidden>
       <div class="detail-header">
         <button type="button" class="icon-button" id="personBackButton" aria-label="Back to people">‹</button>
@@ -104,6 +102,7 @@
   <nav class="tab-bar" aria-label="Sections">
     <button type="button" class="tab-button active" data-view="home"><span class="tab-icon">⌂</span>Home</button>
     <button type="button" class="tab-button" data-view="people"><span class="tab-icon">☰</span>People</button>
+    <button type="button" class="tab-button" data-view="verify"><span class="tab-icon">✓</span>Verify<span class="tab-badge" id="verifyBadge" hidden>0</span></button>
     <button type="button" class="tab-button" id="settingsTabButton"><span class="tab-icon">⚙</span>Settings</button>
   </nav>
 

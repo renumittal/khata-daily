@@ -8,6 +8,7 @@ let transactionType = 'credit';
 let selectedPerson = null;
 let personFilter = 'all';
 let remoteTransactions = [];
+let pendingVerification = [];
 
 function allEntries() {
   const map = new Map();
@@ -23,11 +24,6 @@ const today = () => new Date().toISOString().slice(0, 10);
 function render() {
   const combined = allEntries();
   const visible = showingAll ? combined : combined.filter((entry) => entry.date === today());
-  const credit = visible.filter((entry) => entry.type === 'credit').reduce((sum, entry) => sum + entry.amount, 0);
-  const debit = visible.filter((entry) => entry.type === 'debit').reduce((sum, entry) => sum + entry.amount, 0);
-  $('creditTotal').textContent = currency(credit);
-  $('debitTotal').textContent = currency(debit);
-  $('netTotal').textContent = currency(credit - debit);
   $('activityTitle').textContent = showingAll ? 'All entries' : 'Today';
   $('clearFilter').textContent = showingAll ? 'Today only' : 'View all';
   $('transactionList').innerHTML = visible.slice().sort((a, b) => `${b.date}${b.createdAt}`.localeCompare(`${a.date}${a.createdAt}`)).map((entry) => `
@@ -146,10 +142,74 @@ function personSummary(name) {
 function switchView(view) {
   $('homeView').hidden = view !== 'home';
   $('peopleView').hidden = view !== 'people';
+  $('verifyView').hidden = view !== 'verify';
   $('personDetailView').hidden = view !== 'personDetail';
   document.querySelectorAll('.tab-button[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view || (view === 'personDetail' && button.dataset.view === 'people')));
   if (view === 'people') { renderPeopleDirectory(); loadTransactions().then(() => { if (!$('peopleView').hidden) renderPeopleDirectory(); }); }
   if (view === 'personDetail') renderPersonDetail();
+  if (view === 'verify') loadUnverified();
+}
+
+function renderVerifyList() {
+  $('verifyCount').textContent = pendingVerification.length ? `${pendingVerification.length} pending` : 'All caught up';
+  $('verifyEmpty').hidden = pendingVerification.length > 0;
+  $('verifySubmitButton').hidden = pendingVerification.length === 0;
+  $('verifyList').innerHTML = pendingVerification.map((entry, index) => `
+    <div class="verify-card" data-index="${index}">
+      <label class="verify-check"><input type="checkbox" class="verify-include" checked></label>
+      <div class="verify-fields">
+        <div class="verify-row">
+          <input class="verify-date" type="date" value="${entry.date}">
+          <select class="verify-type">
+            <option value="credit" ${entry.type === 'credit' ? 'selected' : ''}>Credit</option>
+            <option value="debit" ${entry.type === 'debit' ? 'selected' : ''}>Debit</option>
+          </select>
+        </div>
+        <div class="verify-row">
+          <input class="verify-person" type="text" value="${escapeHtml(entry.person)}">
+          <input class="verify-amount" type="number" min="0.01" step="0.01" value="${entry.amount}">
+        </div>
+        <input class="verify-note" type="text" placeholder="Note" value="${escapeHtml(entry.note)}">
+      </div>
+    </div>`).join('');
+}
+
+function updateVerifyBadge() {
+  const badge = $('verifyBadge');
+  badge.textContent = pendingVerification.length;
+  badge.hidden = pendingVerification.length === 0;
+}
+
+async function loadUnverified() {
+  const response = await jsonpRequest({ action: 'unverified' });
+  if (!response || !response.ok) { $('verifyCount').textContent = 'Could not load'; return; }
+  pendingVerification = response.transactions || [];
+  updateVerifyBadge();
+  if (!$('verifyView').hidden) renderVerifyList();
+}
+
+async function submitVerification() {
+  const updates = [];
+  document.querySelectorAll('.verify-card').forEach((card) => {
+    if (!card.querySelector('.verify-include').checked) return;
+    const entry = pendingVerification[Number(card.dataset.index)];
+    updates.push({
+      id: entry.id,
+      date: card.querySelector('.verify-date').value || entry.date,
+      type: card.querySelector('.verify-type').value,
+      person: card.querySelector('.verify-person').value.trim() || entry.person,
+      category: entry.category,
+      amount: Number(card.querySelector('.verify-amount').value) || entry.amount,
+      note: card.querySelector('.verify-note').value.trim(),
+    });
+  });
+  if (!updates.length) { showToast('Select at least one transaction'); return; }
+  $('verifySubmitButton').disabled = true;
+  const response = await jsonpRequest({ action: 'verify', updates: JSON.stringify(updates) });
+  $('verifySubmitButton').disabled = false;
+  if (!response || !response.ok) { showToast('Could not verify — check connection'); return; }
+  showToast(`${updates.length} transaction(s) verified`);
+  await Promise.all([loadUnverified(), loadTransactions()]);
 }
 
 function renderPeopleDirectory() {
@@ -264,8 +324,10 @@ $('managePeopleList').addEventListener('click', (event) => {
   if (!button) return;
   setPersonActive(button.dataset.name, button.dataset.active !== 'true');
 });
+$('verifySubmitButton').addEventListener('click', submitVerification);
 $('exportButton').addEventListener('click', () => { const blob = new Blob([JSON.stringify(entries, null, 2)], { type:'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `khata-daily-${today()}.json`; link.click(); URL.revokeObjectURL(link.href); });
 render();
 loadPeople();
 loadTransactions();
+loadUnverified();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');

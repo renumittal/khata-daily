@@ -15,7 +15,11 @@ function getTransactionsSheet() {
   const spreadsheet = getSpreadsheet();
   let sheet = spreadsheet.getSheetByName(TRANSACTIONS_SHEET_NAME);
   if (!sheet) sheet = spreadsheet.insertSheet(TRANSACTIONS_SHEET_NAME);
-  if (sheet.getLastRow() === 0) sheet.appendRow(['Date', 'Type', 'Person', 'Category', 'Amount', 'Note', 'Entry ID', 'Created At']);
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['Date', 'Type', 'Person', 'Category', 'Amount', 'Note', 'Entry ID', 'Created At', 'Verified']);
+  } else if (!String(sheet.getRange(1, 9).getValue() || '').trim()) {
+    sheet.getRange(1, 9).setValue('Verified');
+  }
   return sheet;
 }
 
@@ -62,7 +66,7 @@ function readTransactions() {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
   const timeZone = getSpreadsheet().getSpreadsheetTimeZone();
-  const values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+  const values = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
   return values
     .filter((row) => row[6])
     .map((row) => ({
@@ -74,7 +78,40 @@ function readTransactions() {
       note: String(row[5] || ''),
       id: String(row[6]),
       createdAt: toIsoString(row[7]),
+      verified: String(row[8] || '').trim().toLowerCase() === 'yes',
     }));
+}
+
+function readUnverifiedTransactions() {
+  return readTransactions().filter((entry) => !entry.verified);
+}
+
+// Maps Entry ID (column G) to its sheet row number, for targeted updates.
+function mapTransactionRowsById(sheet) {
+  const lastRow = sheet.getLastRow();
+  const map = new Map();
+  if (lastRow < 2) return map;
+  const ids = sheet.getRange(2, 7, lastRow - 1, 1).getValues();
+  ids.forEach((row, index) => {
+    const id = String(row[0] || '');
+    if (id) map.set(id, index + 2);
+  });
+  return map;
+}
+
+// Applies corrected fields (if any) to each transaction and flags it Verified in the sheet.
+function verifyTransactions(updates) {
+  const sheet = getTransactionsSheet();
+  const rowsById = mapTransactionRowsById(sheet);
+  return updates.map((update) => {
+    const row = rowsById.get(String(update.id));
+    if (!row) return { id: update.id, ok: false };
+    sheet.getRange(row, 1, 1, 6).setValues([[
+      update.date, update.type, update.person, update.category || '', Number(update.amount), update.note || '',
+    ]]);
+    sheet.getRange(row, 9).setValue('yes');
+    return { id: update.id, ok: true };
+  });
 }
 
 function respond(e, payload) {
@@ -124,6 +161,20 @@ function doGet(e) {
 
   if (params.action === 'transactions') {
     return respond(e, { ok: true, transactions: readTransactions() });
+  }
+
+  if (params.action === 'unverified') {
+    return respond(e, { ok: true, transactions: readUnverifiedTransactions() });
+  }
+
+  if (params.action === 'verify') {
+    try {
+      const updates = JSON.parse(params.updates || '[]');
+      const results = verifyTransactions(updates);
+      return respond(e, { ok: true, results });
+    } catch (error) {
+      return respond(e, { ok: false, error: String(error) });
+    }
   }
 
   if (params.action === 'allPeople') {
