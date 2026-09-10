@@ -499,28 +499,32 @@ $('committeeList').addEventListener('click', (event) => {
   if (!row) return;
   switchCommitteeSub('instalments', row.dataset.no);
 });
-// A committee pays out to one member per month, so months = members; the total
-// pot one member receives (before any boli discount) is members × monthly amount.
+// A committee pays out to one member per month, so months = members; the monthly
+// instalment is the total pot (entered in lakhs) split evenly across members.
+function committeeTotalsFromForm() {
+  const totalMembers = Number($('c_members').value) || 0;
+  const totalAmount = (Number($('c_totalLakhs').value) || 0) * 100000;
+  const monthlyAmount = totalMembers ? Math.round(totalAmount / totalMembers) : 0;
+  return { totalMembers, totalAmount, monthlyAmount };
+}
 function updateCommitteePreview() {
-  const members = Number($('c_members').value) || 0;
-  const monthly = Number($('c_monthly').value) || 0;
-  $('c_preview').textContent = members
-    ? `${members} months · Total pot ${currency(members * monthly)}`
-    : 'A committee runs one month per member, so months and total pot are worked out automatically.';
+  const { totalMembers, totalAmount, monthlyAmount } = committeeTotalsFromForm();
+  $('c_preview').textContent = totalMembers && totalAmount
+    ? `${totalMembers} months · ${currency(monthlyAmount)}/month · Total ${currency(totalAmount)}`
+    : 'Months and the monthly instalment are worked out automatically from the total amount and member count.';
 }
 $('c_members').addEventListener('input', updateCommitteePreview);
-$('c_monthly').addEventListener('input', updateCommitteePreview);
+$('c_totalLakhs').addEventListener('input', updateCommitteePreview);
 
 $('committeeForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const no = $('c_no').value.trim();
   if (!no) { showToast('Committee No is required'); return; }
-  const totalMembers = Number($('c_members').value) || 0;
-  const monthlyAmount = Number($('c_monthly').value) || 0;
+  const { totalMembers, totalAmount, monthlyAmount } = committeeTotalsFromForm();
   const response = await committeeRequest({
     action: 'addCommittee', no,
     totalMembers, totalMonths: totalMembers,
-    monthlyAmount, totalAmount: totalMembers * monthlyAmount,
+    monthlyAmount, totalAmount,
     cutPercent: $('c_cut').value,
     startMonth: $('c_start').value, status: $('c_status').value,
   });
