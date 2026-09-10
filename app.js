@@ -254,12 +254,24 @@ async function loadCommitteeInstalments() {
 }
 
 async function loadCommitteeMonths() {
-  if (!selectedCommitteeNo) { committeeMonths = []; updateMonthPreview(); return; }
+  if (!selectedCommitteeNo) { committeeMonths = []; updateMonthPreview(); renderMonthHistory(); return; }
   const response = await committeeRequest({ action: 'committeeMonths', no: selectedCommitteeNo });
   committeeMonths = (response && response.months) || [];
   const existing = committeeMonths.find((m) => m.month === $('m_month').value);
   $('m_ghata').value = existing ? existing.ghata : '';
   updateMonthPreview();
+  renderMonthHistory();
+}
+
+function renderMonthHistory() {
+  const committee = committeeByNo(selectedCommitteeNo);
+  const sorted = [...committeeMonths].sort((a, b) => b.month.localeCompare(a.month));
+  $('monthHistoryEmpty').hidden = sorted.length > 0;
+  $('monthHistory').innerHTML = sorted.map((m) => `
+    <div class="month-row">
+      <span class="month-label">${escapeHtml(formatMonth(m.month))}</span>
+      <span class="month-figures">GHATA ${currency(m.ghata)}<br>KIST ${currency(m.kist)}/member${committee ? ` · Total ${currency(m.kist * committee.totalMembers)}` : ''}</span>
+    </div>`).join('');
 }
 
 function renderCommitteeInfo() {
