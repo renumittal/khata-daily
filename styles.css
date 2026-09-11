@@ -711,6 +711,19 @@ dialog::backdrop {
     text-align: right;
 }
 
+.status-pill {
+    display: inline-block;
+    margin-bottom: 4px;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 30px;
+    background: var(--green-soft);
+    color: var(--green);
+}
+
 .person-summary-balance strong {
     display: block;
     font-family: 'Space Grotesk',sans-serif;

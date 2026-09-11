@@ -541,6 +541,10 @@ function renderAnalysisPerson() {
     const netWithPerson = list.reduce((sum, c) => sum + currentNetInvst(c, instalmentsByNo.get(c.no)), 0);
     const netState = netWithPerson > 0 ? 'owed' : netWithPerson < 0 ? 'owing' : 'settled';
     const netLabel = netState === 'owed' ? `${escapeHtml(person)} owes you` : netState === 'owing' ? `You owe ${escapeHtml(person)}` : 'Settled';
+    // Every committee in `list` is already filtered to non-Closed above, so
+    // one badge for the whole group covers all of its rows — no need to
+    // repeat a "Running" cell on every single one.
+    const groupStatus = list[0]?.status || 'Running';
     return `
     <div class="analysis-person-group">
       <div class="person-summary-row">
@@ -550,13 +554,14 @@ function renderAnalysisPerson() {
           <div class="person-summary-meta">${list.length} committee${list.length > 1 ? 's' : ''} · ${currency(totalPot)} total · ${takenCount} taken</div>
         </div>
         <div class="person-summary-balance ${netState}">
+          <span class="status-pill">${escapeHtml(groupStatus)}</span>
           <strong>${currency(Math.abs(netWithPerson))}</strong>
           <small>${netLabel}</small>
         </div>
       </div>
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Committee</th><th>Kist #</th><th>Status</th><th>Members</th><th>Total pot (L)</th><th>Start</th><th>Taken</th><th>Total Invst (L)</th></tr></thead>
+          <thead><tr><th>Committee</th><th>Kist #</th><th>Total pot (L)</th><th>Start</th><th>Taken</th><th>Total Invst (L)</th></tr></thead>
           <tbody>
             ${list.map((c) => {
               const inst = instalmentsByNo.get(c.no);
@@ -571,14 +576,15 @@ function renderAnalysisPerson() {
               // cycle position today, clamped to its actual timeline (a
               // committee that hasn't started yet or has already run its
               // course shows its first/last kist rather than an out-of-range number).
+              // totalMonths doubles as the member count (one payout per
+              // member per month), so this already covers a separate Members
+              // column.
               const rawIdx = monthIndexFor(c, currentYYYYMM());
               const kistNo = rawIdx === null ? null : Math.max(1, Math.min(c.totalMonths, rawIdx));
               return `
               <tr>
                 <td>#${escapeHtml(c.no)}</td>
                 <td>${kistNo !== null ? `${kistNo}/${c.totalMonths}` : '—'}</td>
-                <td>${escapeHtml(c.status || 'Running')}</td>
-                <td>${c.totalMembers}</td>
                 <td>${currencyLakhs(c.totalAmount)}</td>
                 <td>${c.startMonth ? formatDate(c.startMonth) : '—'}</td>
                 <td>${taken ? `Yes (${escapeHtml(formatMonth(inst.takenMonth))})` : 'No'}</td>
