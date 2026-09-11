@@ -27,6 +27,21 @@
  *   "Committee Instalments" for that committee (see saveCommitteeMonth_).
  */
 
+// Month fields (StartMonth, TakenMonth, Month) are stored as YYYY-MM text, but
+// Google Sheets sometimes auto-converts a bare "2026-09"-looking string into an
+// actual Date cell on save — reading that back with a plain String() then prints
+// its full JS toString() ("Tue Sep 01 2026 00:00:00 GMT+0530 ..."). Normalize any
+// Date cell back to YYYY-MM here, and force new writes to stay plain text via a
+// leading apostrophe (asText_) so this doesn't happen again going forward.
+function toYearMonthString_(value) {
+  if (value instanceof Date) return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM');
+  return String(value || '');
+}
+function asText_(value) {
+  const trimmed = String(value || '').trim();
+  return trimmed ? "'" + trimmed : '';
+}
+
 function getCommitteesSheet_() {
   const spreadsheet = getSpreadsheet();
   let sheet = spreadsheet.getSheetByName(COMMITTEES_SHEET_NAME);
@@ -62,7 +77,7 @@ function readCommittees_() {
       totalAmount: Number(row[4]) || 0,
       cutPercent: Number(row[5]) || 0,
       extraProfit: Number(row[6]) || 0,
-      startMonth: String(row[7] || ''),
+      startMonth: toYearMonthString_(row[7]),
       status: String(row[8] || ''),
     }));
 }
@@ -72,7 +87,7 @@ function addCommittee_(params) {
   sheet.appendRow([
     String(params.no || '').trim(), Number(params.totalMembers) || 0, Number(params.totalMonths) || 0,
     Number(params.monthlyAmount) || 0, Number(params.totalAmount) || 0, Number(params.cutPercent) || 0,
-    Number(params.extraProfit) || 0, params.startMonth || '', params.status || 'Running',
+    Number(params.extraProfit) || 0, asText_(params.startMonth), params.status || 'Running',
   ]);
 }
 
@@ -84,7 +99,7 @@ function readCommitteeInstalments_(committeeNo) {
   return values
     .map((row, index) => ({
       row: index + 2, no: String(row[0] || ''), person: String(row[1] || ''), isTaken: String(row[2] || ''),
-      amount: Number(row[3]) || 0, takenMonth: String(row[4] || ''), kist: Number(row[5]) || 0,
+      amount: Number(row[3]) || 0, takenMonth: toYearMonthString_(row[4]), kist: Number(row[5]) || 0,
       ghata: Number(row[6]) || 0, sarkari: Number(row[7]) || 0, status: String(row[8] || ''), pendingMonth: String(row[9] || ''),
     }))
     .filter((entry) => entry.person && (!committeeNo || entry.no === String(committeeNo)));
@@ -96,7 +111,7 @@ function saveCommitteeInstalment_(params) {
   const no = String(params.no || '').trim();
   const person = String(params.person || '').trim();
   const existing = readCommitteeInstalments_(no).find((entry) => entry.person.toLowerCase() === person.toLowerCase());
-  const values = [no, person, params.isTaken || 'No', Number(params.amount) || 0, params.takenMonth || '', Number(params.kist) || 0, Number(params.ghata) || 0, Number(params.sarkari) || 0, params.status || '', params.pendingMonth || ''];
+  const values = [no, person, params.isTaken || 'No', Number(params.amount) || 0, asText_(params.takenMonth), Number(params.kist) || 0, Number(params.ghata) || 0, Number(params.sarkari) || 0, params.status || '', params.pendingMonth || ''];
   if (existing) {
     sheet.getRange(existing.row, 1, 1, 10).setValues([values]);
   } else {
@@ -120,7 +135,7 @@ function readCommitteeMonths_(committeeNo) {
   if (lastRow < 2) return [];
   const values = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
   return values
-    .map((row, index) => ({ row: index + 2, no: String(row[0] || ''), month: String(row[1] || ''), ghata: Number(row[2]) || 0, kist: Number(row[3]) || 0 }))
+    .map((row, index) => ({ row: index + 2, no: String(row[0] || ''), month: toYearMonthString_(row[1]), ghata: Number(row[2]) || 0, kist: Number(row[3]) || 0 }))
     .filter((entry) => entry.month && (!committeeNo || entry.no === String(committeeNo)));
 }
 
@@ -139,9 +154,9 @@ function saveCommitteeMonth_(params) {
   const monthsSheet = getCommitteeMonthsSheet_();
   const existing = readCommitteeMonths_(no).find((entry) => entry.month === month);
   if (existing) {
-    monthsSheet.getRange(existing.row, 1, 1, 4).setValues([[no, month, ghata, kist]]);
+    monthsSheet.getRange(existing.row, 1, 1, 4).setValues([[no, asText_(month), ghata, kist]]);
   } else {
-    monthsSheet.appendRow([no, month, ghata, kist]);
+    monthsSheet.appendRow([no, asText_(month), ghata, kist]);
   }
 
   const instSheet = getCommitteeInstalmentsSheet_();
