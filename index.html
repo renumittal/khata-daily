@@ -106,6 +106,7 @@
         <button type="button" class="type-option active" data-csub="list">List</button>
         <button type="button" class="type-option" data-csub="add">Add new</button>
         <button type="button" class="type-option" data-csub="instalments">Instalments</button>
+        <button type="button" class="type-option" data-csub="month">By Month</button>
         <button type="button" class="type-option" data-csub="analysis">Analysis</button>
       </div>
 
@@ -158,6 +159,21 @@
         <div class="empty-state" id="monthHistoryEmpty" hidden><span>◈</span><p>No months yet</p><small>Add the committee's Start date to generate its month rows.</small></div>
         <button class="primary-button" type="button" id="saveMonthsButton" hidden>Save these months</button>
         <div class="empty-state" id="m_openEmpty" hidden><span>✓</span><p>All caught up</p><small>No unfilled months up to the current one.</small></div>
+      </div>
+
+      <div class="committee-sub" id="committeeSub-month" hidden>
+        <label>Month<input id="mv_month" type="month"></label>
+        <p class="dialog-copy" id="mv_summary"></p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th>Committee</th><th>Kist #</th><th>Boli date</th><th>Sarkari GHATA</th><th>Actual GHATA</th><th>KIST/member</th><th>Taken</th></tr>
+            </thead>
+            <tbody id="monthViewBody"></tbody>
+          </table>
+        </div>
+        <div class="empty-state" id="monthViewEmpty" hidden><span>◈</span><p>No committees running this month</p><small>Pick a different month, or add a committee first.</small></div>
+        <button class="primary-button" type="button" id="saveMonthViewButton" hidden>Save this month</button>
       </div>
 
       <div class="committee-sub" id="committeeSub-analysis" hidden>

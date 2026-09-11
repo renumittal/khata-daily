@@ -31,6 +31,18 @@
  *   app. Whichever row's month matches a member's TakenMonth gets that
  *   member's name + the amount they received, highlighted with a background
  *   colour, kept in sync from both saveCommitteeMonth_ and saveCommitteeInstalment_.
+ *
+ * "<Mon>-<YY>" e.g. "Jun-26", "Jul-26", "Aug-26" (one sheet per CALENDAR month,
+ *   cutting across every committee — the rollup view, not a source of truth)
+ *   Sr No | Committee No | Installment No | Total Month | Monthly A | GHATA |
+ *   Sarkari | Extra Profit | Total Invst | Is Taken | Taken Month | Pending Month | Status
+ *   Fully rebuilt from Committees + Committee Instalments + the committee's
+ *   own month sheet every time refreshCalendarMonthSheet_ runs (after every
+ *   saveCommitteeMonth_, or on demand) — never hand-edited. Installment No is
+ *   that committee's own cycle position for this month (unrelated to any
+ *   other committee's row in the same sheet). Total Invst flips sign once a
+ *   committee has been taken by that point in time: negative = still owed
+ *   back to the owner, positive = still invested with the pot.
  */
 
 // Month fields (StartMonth, TakenMonth) are stored as text, but Google Sheets
@@ -331,6 +343,96 @@ function saveCommitteeMonth_(params) {
   }
 
   applyTakenHighlight_(committee);
+  refreshCalendarMonthSheet_(month);
 
   return { ok: true, ghata, kist };
+}
+
+// ---------- Calendar-month rollup ("Jun-26", "Jul-26", "Aug-26", ...) ----------
+//
+// Cuts across every committee to show one row per committee for a given
+// calendar month — this is a read-only snapshot rebuilt from Committees +
+// Committee Instalments + the per-committee month sheets, never edited by
+// hand, so it's safe to fully recompute on every refresh rather than track
+// incremental edits.
+//
+// Total Invst sign convention (per committee, as of this calendar month):
+//   already taken by this month  -> -(months still owed * MonthlyAmount)
+//                                    (money owed back TO the committee owner)
+//   not yet taken by this month  -> +(months paid so far * MonthlyAmount)
+//                                    (still an investment held WITH the pot)
+// "Installment No" is this committee's OWN cycle position (e.g. its 7th
+// kist), independent of any other committee's position in the same
+// calendar-month sheet — never derive it from another row.
+function calendarMonthLabel_(yyyymm) {
+  if (!/^\d{4}-\d{2}$/.test(yyyymm || '')) return '';
+  const [y, m] = yyyymm.split('-').map(Number);
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${monthNames[m - 1]}-${String(y).slice(2)}`;
+}
+
+function getCalendarMonthSheet_(yyyymm) {
+  const spreadsheet = getSpreadsheet();
+  const name = calendarMonthLabel_(yyyymm);
+  let sheet = spreadsheet.getSheetByName(name);
+  if (!sheet) sheet = spreadsheet.insertSheet(name);
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['Sr No', 'Committee No', 'Installment No', 'Total Month', 'Monthly A', 'GHATA', 'Sarkari', 'Extra Profit', 'Total Invst', 'Is Taken', 'Taken Month', 'Pending Month', 'Status', 'Boli Date', 'Filled']);
+  }
+  return sheet;
+}
+
+function refreshCalendarMonthSheet_(yyyymm) {
+  if (!/^\d{4}-\d{2}$/.test(yyyymm || '')) return;
+  const sheet = getCalendarMonthSheet_(yyyymm);
+  const rows = [];
+
+  readCommittees_().forEach((committee) => {
+    const idx = monthIndexFor_(committee, yyyymm);
+    if (idx === null || idx < 1 || idx > committee.totalMonths) return; // not running this month
+
+    const monthRow = readCommitteeMonths_(committee.no).find((m) => m.month === yyyymm);
+    const ghata = monthRow ? monthRow.ghata : 0;
+    const filled = Boolean(monthRow && (monthRow.boliDate || monthRow.ghata));
+
+    const instalment = readCommitteeInstalments_(committee.no)[0];
+    const takenIdx = instalment && instalment.isTaken === 'Yes' && instalment.takenMonth
+      ? monthIndexFor_(committee, instalment.takenMonth) : null;
+    const takenByThisMonth = takenIdx !== null && takenIdx <= idx;
+
+    const pendingMonth = committee.totalMonths - idx;
+    const cut = (Number(committee.cutPercent) || 0) / 100;
+    const sarkari = Math.round(committee.monthlyAmount - committee.monthlyAmount * cut * pendingMonth);
+    const extraProfit = committee.totalMonths ? (ghata - sarkari) / committee.totalMonths : 0;
+    const totalInvst = takenByThisMonth ? -(pendingMonth * committee.monthlyAmount) : committee.monthlyAmount * idx;
+
+    rows.push([
+      rows.length + 1, committee.no, idx, committee.totalMonths, committee.monthlyAmount,
+      ghata, sarkari, extraProfit, totalInvst,
+      takenByThisMonth ? 'Yes' : 'No',
+      takenByThisMonth && instalment ? instalment.takenMonth : '',
+      pendingMonth,
+      takenByThisMonth ? 'Taken' : '',
+      monthRow ? monthRow.boliDate : '',
+      filled ? 'Yes' : 'No',
+    ]);
+  });
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, 15).clearContent();
+  if (rows.length) sheet.getRange(2, 1, rows.length, 15).setValues(rows);
+}
+
+function readCalendarMonth_(yyyymm) {
+  refreshCalendarMonthSheet_(yyyymm);
+  const sheet = getCalendarMonthSheet_(yyyymm);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const values = sheet.getRange(2, 1, lastRow - 1, 15).getValues();
+  return values.map((row) => ({
+    srNo: row[0], no: String(row[1] || ''), installmentNo: row[2], totalMonth: row[3], monthlyAmount: row[4],
+    ghata: row[5], sarkari: row[6], extraProfit: row[7], totalInvst: row[8], isTaken: String(row[9] || ''),
+    takenMonth: String(row[10] || ''), pendingMonth: row[11], status: String(row[12] || ''),
+    boliDate: toDateString_(row[13]), filled: String(row[14] || '') === 'Yes',
+  }));
 }

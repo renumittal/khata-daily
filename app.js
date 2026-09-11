@@ -16,6 +16,8 @@ let selectedCommitteeNo = null;
 let committeeSub = 'list';
 let analysisData = { committees: [], instalments: [], months: [] };
 let analysisReport = 'month';
+let monthViewMonth = null;
+let monthViewRows = [];
 
 function currentYYYYMM() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function formatMonth(yyyyMm) {
@@ -219,14 +221,99 @@ function switchView(view) {
 
 function switchCommitteeSub(sub, preselectNo) {
   committeeSub = sub;
-  ['list', 'add', 'instalments', 'analysis'].forEach((name) => { $(`committeeSub-${name}`).hidden = name !== sub; });
+  ['list', 'add', 'instalments', 'month', 'analysis'].forEach((name) => { $(`committeeSub-${name}`).hidden = name !== sub; });
   document.querySelectorAll('.type-switch [data-csub]').forEach((button) => button.classList.toggle('active', button.dataset.csub === sub));
   if (sub === 'add') {
     $('c_no').innerHTML = '<option value="">Pick a person</option>' + people.map((name) => `<option>${escapeHtml(name)}</option>`).join('');
     $('c_existingHint').textContent = '';
   }
   if (sub === 'instalments') populateCommitteeSelect(preselectNo || selectedCommitteeNo);
+  if (sub === 'month') {
+    if (!$('mv_month').value) $('mv_month').value = currentYYYYMM();
+    loadMonthView($('mv_month').value);
+  }
   if (sub === 'analysis') loadCommitteeAnalysis();
+}
+
+// Month-first entry: pick a calendar month, see every committee whose own
+// cycle has a kist due that month (regardless of which committee it is),
+// and fill in GHATA/taken right there — mirrors the committee-first
+// "Instalments" tab's save flow but grouped by month instead of by committee.
+async function loadMonthView(month) {
+  monthViewMonth = month;
+  if (!committees.length) await loadCommittees();
+  if (!isYYYYMM(month)) { monthViewRows = []; renderMonthView(); return; }
+  const response = await committeeRequest({ action: 'calendarMonth', month });
+  monthViewRows = (response && response.rows) || [];
+  renderMonthView();
+}
+
+function renderMonthView() {
+  const sorted = [...monthViewRows].sort((a, b) => a.no.localeCompare(b.no));
+  $('monthViewEmpty').hidden = sorted.length > 0;
+  const unfilled = sorted.filter((r) => !r.filled).length;
+  $('mv_summary').textContent = sorted.length
+    ? `${sorted.length} committee${sorted.length > 1 ? 's' : ''} running · ${unfilled} need${unfilled === 1 ? 's' : ''} this month's entry`
+    : '';
+  $('monthViewBody').innerHTML = sorted.map((r) => {
+    const committee = committeeByNo(r.no);
+    const boliDate = r.boliDate || (committee ? boliDateFor(committee, monthViewMonth) : '');
+    if (r.filled) {
+      return `
+      <tr class="${r.isTaken === 'Yes' ? 'month-taken' : ''}">
+        <td>#${escapeHtml(r.no)}</td>
+        <td>${r.installmentNo}/${r.totalMonth}</td>
+        <td>${boliDate ? formatDate(boliDate) : '—'}</td>
+        <td>${currency(r.sarkari)}</td>
+        <td>${currency(r.ghata)}</td>
+        <td>${currency(committee ? kistFor(committee, r.ghata) : 0)}</td>
+        <td>${r.isTaken === 'Yes' ? 'Yes' : 'No'}</td>
+      </tr>`;
+    }
+    return `
+    <tr class="month-open" data-no="${escapeHtml(r.no)}">
+      <td>#${escapeHtml(r.no)}</td>
+      <td>${r.installmentNo}/${r.totalMonth}</td>
+      <td>${boliDate ? formatDate(boliDate) : '—'}</td>
+      <td>${currency(r.sarkari)}</td>
+      <td><input class="mv-ghata-input" type="number" min="0" value=""></td>
+      <td class="mv-kist-cell">${currency(committee ? kistFor(committee, 0) : 0)}</td>
+      <td><select class="mv-taken-select"><option selected>No</option><option>Yes</option></select></td>
+    </tr>`;
+  }).join('');
+  $('saveMonthViewButton').hidden = !unfilled;
+}
+
+async function saveMonthView() {
+  const month = monthViewMonth;
+  const rows = [...document.querySelectorAll('#monthViewBody tr[data-no]')]
+    .filter((row) => row.querySelector('.mv-ghata-input').value.trim() !== '');
+  if (!rows.length) { showToast('Enter GHATA for at least one committee first'); return; }
+
+  for (const row of rows) {
+    const no = row.dataset.no;
+    const committee = committeeByNo(no);
+    const ghata = Number(row.querySelector('.mv-ghata-input').value) || 0;
+    const minGhata = sarkariGhataFor(committee, month);
+    if (minGhata !== '' && ghata < minGhata) {
+      showToast(`#${no}: GHATA can't be less than the Sarkari minimum of ${currency(minGhata)}`);
+      return;
+    }
+  }
+
+  let saved = 0;
+  for (const row of rows) {
+    const no = row.dataset.no;
+    const committee = committeeByNo(no);
+    const ghata = Number(row.querySelector('.mv-ghata-input').value) || 0;
+    const taken = row.querySelector('.mv-taken-select').value;
+    const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken }, 25000);
+    if (response && response.ok) saved++;
+  }
+  showToast(saved === rows.length
+    ? `${saved} committee${saved > 1 ? 's' : ''} saved for ${formatMonth(month)}`
+    : `Saved ${saved} of ${rows.length} — check the connection and try the rest again`);
+  await loadMonthView(month);
 }
 
 function switchAnalysisReport(report) {
@@ -779,6 +866,16 @@ $('monthHistory').addEventListener('input', (event) => {
   row.querySelector('.pot-cell').textContent = currency(committee.totalAmount - ghata);
 });
 $('saveMonthsButton').addEventListener('click', saveCommitteeMonths);
+$('mv_month').addEventListener('change', () => loadMonthView($('mv_month').value));
+// Rows are re-created on every render, so this has to be delegated from a stable ancestor.
+$('monthViewBody').addEventListener('input', (event) => {
+  if (!event.target.classList.contains('mv-ghata-input')) return;
+  const row = event.target.closest('tr');
+  const committee = committeeByNo(row.dataset.no);
+  const ghata = Number(event.target.value) || 0;
+  row.querySelector('.mv-kist-cell').textContent = currency(kistFor(committee, ghata));
+});
+$('saveMonthViewButton').addEventListener('click', saveMonthView);
 $('addPersonButton').addEventListener('click', addPerson);
 $('newPersonName').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addPerson(); } });
 $('managePeopleList').addEventListener('click', (event) => {

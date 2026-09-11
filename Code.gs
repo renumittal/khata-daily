@@ -233,6 +233,24 @@ function doGet(e) {
     }
   }
 
+  if (params.action === 'calendarMonth') {
+    try {
+      return respond(e, { ok: true, rows: readCalendarMonth_(params.month) });
+    } catch (error) {
+      return respond(e, { ok: false, error: String(error) });
+    }
+  }
+
+  if (params.action === 'refreshCalendarMonths') {
+    try {
+      const months = String(params.months || '').split(',').map((m) => m.trim()).filter(Boolean);
+      months.forEach((m) => refreshCalendarMonthSheet_(m));
+      return respond(e, { ok: true });
+    } catch (error) {
+      return respond(e, { ok: false, error: String(error) });
+    }
+  }
+
   const people = [...new Set(readPeopleRows().filter((entry) => entry.active).map((entry) => entry.name))].sort();
   return respond(e, { ok: true, people });
 }
