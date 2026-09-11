@@ -287,16 +287,22 @@ function renderAnalysisMonth() {
 // single group instead of hunting through the flat committee list.
 function renderAnalysisPerson() {
   const instalmentsByNo = new Map(analysisData.instalments.map((i) => [i.no, i]));
+  // Grouped case-insensitively (a stray "vijay" vs "Vijay" typo shouldn't
+  // split one person into two groups) — the display name is whichever
+  // casing the People list itself uses, falling back to the first seen.
   const groups = new Map();
   analysisData.committees.forEach((c) => {
     const person = personOf(c.no);
-    if (!groups.has(person)) groups.set(person, []);
-    groups.get(person).push(c);
+    const key = person.toLowerCase();
+    if (!groups.has(key)) groups.set(key, { display: person, committees: [] });
+    groups.get(key).committees.push(c);
   });
-  const peopleSorted = [...groups.keys()].sort();
-  $('analysisPersonEmpty').hidden = peopleSorted.length > 0;
-  $('analysisPersonList').innerHTML = peopleSorted.map((person) => {
-    const list = groups.get(person).slice().sort((a, b) => (a.startMonth || '').localeCompare(b.startMonth || ''));
+  people.forEach((name) => { const group = groups.get(name.toLowerCase()); if (group) group.display = name; });
+  const keysSorted = [...groups.keys()].sort((a, b) => groups.get(a).display.localeCompare(groups.get(b).display));
+  $('analysisPersonEmpty').hidden = keysSorted.length > 0;
+  $('analysisPersonList').innerHTML = keysSorted.map((key) => {
+    const { display: person, committees } = groups.get(key);
+    const list = committees.slice().sort((a, b) => (a.startMonth || '').localeCompare(b.startMonth || ''));
     const totalPot = list.reduce((sum, c) => sum + (c.totalAmount || 0), 0);
     const takenCount = list.filter((c) => { const inst = instalmentsByNo.get(c.no); return inst && inst.isTaken === 'Yes'; }).length;
     return `
@@ -354,7 +360,10 @@ async function loadCommittees() {
 
 // A committee's "no" is "Person (start date)" so the same person can run more than
 // one committee — strip the date back off when only the person's name is wanted.
-function personOf(no) { return String(no || '').replace(/\s*\(.*\)$/, ''); }
+// Mirrors personOf_ in CommitteBackend.gs — strip from the opening
+// parenthesis onward (not anchored to the string's end) so a de-duped
+// " #2"-style suffix after the date doesn't get stuck to the person's name.
+function personOf(no) { return String(no || '').replace(/\s*\(.*/, ''); }
 
 function renderCommittees() {
   $('committeeEmpty').hidden = committees.length > 0;

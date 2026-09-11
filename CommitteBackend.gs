@@ -144,10 +144,13 @@ function saveCommitteeInstalment_(params) {
 
 // ---------- Per-committee "Kameti - <person>" sheet ----------
 
-// A committee's "no" is "Person (start date)" — strip the date back off when
-// only the person's name is wanted (e.g. as the row in Committee Instalments).
+// A committee's "no" is "Person (start date)", optionally with a " #2" style
+// suffix appended for duplicates — strip everything from the opening
+// parenthesis onward when only the person's name is wanted (e.g. as the row
+// in Committee Instalments). Anchoring the parenthesis to the end of the
+// string would miss that " #2" suffix and leave it stuck to the name.
 function personOf_(no) {
-  return String(no || '').replace(/\s*\(.*\)$/, '');
+  return String(no || '').replace(/\s*\(.*/, '');
 }
 
 function committeeSheetName_(no) {
