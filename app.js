@@ -59,14 +59,16 @@ function committeeEndDate(committee) {
   return addMonthsToDate(committee.startMonth, committee.totalMonths - 1);
 }
 // The floor GHATA for a given month: TotalMembers × MonthlyAmount × Cut% × (months
-// remaining after this one). The boli/auction discount actually entered that month
-// can't be lower than this — it's the guaranteed minimum cut.
+// remaining, THIS one included). The boli/auction discount actually entered that
+// month can't be lower than this — it's the guaranteed minimum cut. Mirrors
+// sarkariGhataFor_ in CommitteBackend.gs — keep both in sync.
 function sarkariGhataFor(committee, monthYYYYMM) {
   if (!committee) return '';
   const idx = monthIndexFor(committee, monthYYYYMM);
   if (idx === null) return '';
   const cut = (Number(committee.cutPercent) || 0) / 100;
-  return Math.max(0, Math.round(committee.totalMembers * committee.monthlyAmount * cut * (committee.totalMonths - idx)));
+  const pendingInclusive = committee.totalMonths - idx + 1;
+  return Math.max(0, Math.round(committee.totalMembers * committee.monthlyAmount * cut * pendingInclusive));
 }
 // KIST for a member this month = MonthlyAmount − (GHATA ÷ TotalMembers), the boli discount split evenly.
 function kistFor(committee, ghata) {
@@ -431,7 +433,7 @@ function renderAnalysisMonth() {
       <h3 class="analysis-month-title">${escapeHtml(formatMonth(month))}</h3>
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Committee</th><th>Boli date</th><th>GHATA</th><th>KIST</th><th>Pot amount</th><th>Taken by</th></tr></thead>
+          <thead><tr><th>Committee</th><th>Boli date</th><th>GHATA</th><th>KIST</th><th>Pot amount</th><th>Taken</th></tr></thead>
           <tbody>
             ${rows.map((r) => {
               const committee = committeesByNo.get(r.no);
@@ -443,7 +445,7 @@ function renderAnalysisMonth() {
                 <td>${currency(r.ghata)}</td>
                 <td>${currency(r.kist)}</td>
                 <td>${potAmount !== null ? currency(potAmount) : '—'}</td>
-                <td>${escapeHtml(r.takenBy || 'No')}</td>
+                <td>${r.takenBy ? 'Yes' : 'No'}</td>
               </tr>`;
             }).join('')}
           </tbody>

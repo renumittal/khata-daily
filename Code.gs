@@ -255,6 +255,15 @@ function doGet(e) {
     }
   }
 
+  if (params.action === 'updateCommitteeStartMonth') {
+    try {
+      updateCommitteeStartMonth_(params.no, params.startMonth);
+      return respond(e, { ok: true });
+    } catch (error) {
+      return respond(e, { ok: false, error: String(error) });
+    }
+  }
+
   if (params.action === 'renameInstalmentPerson') {
     try {
       renameInstalmentPerson_(params.no, params.newPerson);

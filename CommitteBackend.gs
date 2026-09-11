@@ -125,6 +125,22 @@ function addCommittee_(params) {
   refreshPersonNetSheet_(personOf_(committee.no));
 }
 
+// Corrects a committee's Start date after the fact (e.g. the real boli day
+// turns out to differ from what was first entered) — only the day-of-month
+// actually matters for anything derived from it (boliDateFor on the client,
+// sarkariGhataFor_'s month-position math is year+month only and is
+// unaffected), so this is safe to change without touching installment
+// numbers or pending-month counts.
+function updateCommitteeStartMonth_(no, startMonth) {
+  const sheet = getCommitteesSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error('No committees yet');
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  const rowIndex = ids.findIndex((r) => String(r[0] || '') === no);
+  if (rowIndex === -1) throw new Error('Committee not found: ' + no);
+  sheet.getRange(rowIndex + 2, 8).setValue(asText_(startMonth));
+}
+
 function readCommitteeInstalments_(committeeNo) {
   const sheet = getCommitteeInstalmentsSheet_();
   const lastRow = sheet.getLastRow();
@@ -194,6 +210,12 @@ function getCommitteeSheetByNo_(no) {
   if (!sheet) sheet = spreadsheet.insertSheet(name);
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(['Month', 'Boli date', 'Sarkari GHATA', 'Actual GHATA', 'KIST/member', 'Taken by', 'Amount received', 'Verified']);
+  } else if (!String(sheet.getRange(1, 8).getValue() || '').trim()) {
+    // Backfills the header on sheets created before the Verified column
+    // existed — same pattern as getTransactionsSheet()'s own Verified column
+    // in Code.gs. The column itself was already safe to read/write (fixed
+    // index, not by header name); this only fixes the blank label in H1.
+    sheet.getRange(1, 8).setValue('Verified');
   }
   return sheet;
 }
@@ -217,11 +239,17 @@ function addMonthsToYearMonth_(startYYYYMM, offset) {
   const month = ((total % 12) + 12) % 12 + 1;
   return `${year}-${String(month).padStart(2, '0')}`;
 }
+// Pending months here is INCLUSIVE of the current one being bid on — the
+// guaranteed floor discount covers every kist not yet collected, this
+// month's included, not just the ones strictly after it. (Verified against
+// real Sarkari GHATA figures: cut is a flat 1%, and matching them required
+// counting this month too, not totalMonths - idx.)
 function sarkariGhataFor_(committee, monthYYYYMM) {
   const idx = monthIndexFor_(committee, monthYYYYMM);
   if (idx === null) return 0;
   const cut = (Number(committee.cutPercent) || 0) / 100;
-  return Math.max(0, Math.round(committee.totalMembers * committee.monthlyAmount * cut * (committee.totalMonths - idx)));
+  const pendingInclusive = committee.totalMonths - idx + 1;
+  return Math.max(0, Math.round(committee.totalMembers * committee.monthlyAmount * cut * pendingInclusive));
 }
 
 // Ensures the committee's own sheet has one row for every month of its
@@ -298,7 +326,8 @@ function applyTakenHighlight_(committee) {
       // rupees to rounding (each member's KIST is rounded individually, but
       // the total pot handed to the taker isn't built up from those roundings).
       const received = r.boliDate ? (committee.totalAmount - r.ghata) : 0;
-      takenValues.push([taker.person, received]);
+      // "Taken by" is always Renu here — Yes is enough, no need to name her.
+      takenValues.push(['Yes', received]);
       backgrounds.push(Array(7).fill('#d9ead3'));
     } else {
       takenValues.push(['', '']);
@@ -362,7 +391,9 @@ function saveCommitteeMonth_(params) {
 
   if (params.taken === 'Yes') {
     const cut = (Number(committee.cutPercent) || 0) / 100;
-    const sarkari = idx !== null ? Math.round(committee.monthlyAmount - committee.monthlyAmount * cut * (committee.totalMonths - idx)) : 0;
+    // Same inclusive-of-this-month count as sarkariGhataFor_ — kept algebraically
+    // consistent (this is that total divided across totalMembers).
+    const sarkari = idx !== null ? Math.round(committee.monthlyAmount - committee.monthlyAmount * cut * (committee.totalMonths - idx + 1)) : 0;
     saveCommitteeInstalment_({ no, person, isTaken: 'Yes', takenMonth: month, amount: committee.totalAmount - ghata, kist, ghata, sarkari, status: 'Taken', pendingMonth });
   } else if (!alreadyTakenElsewhere) {
     saveCommitteeInstalment_({ no, person, isTaken: 'No', takenMonth: '', amount: 0, kist, ghata, sarkari: 0, status: '', pendingMonth });
@@ -461,7 +492,9 @@ function refreshCalendarMonthSheet_(yyyymm) {
 
     const pendingMonth = committee.totalMonths - idx;
     const cut = (Number(committee.cutPercent) || 0) / 100;
-    const sarkari = Math.round(committee.monthlyAmount - committee.monthlyAmount * cut * pendingMonth);
+    // Sarkari's own pending count includes this month (see sarkariGhataFor_) —
+    // "pendingMonth" above stays exclusive, that's a separate displayed figure.
+    const sarkari = Math.round(committee.monthlyAmount - committee.monthlyAmount * cut * (pendingMonth + 1));
     const extraProfit = committee.totalMonths ? (ghata - sarkari) / committee.totalMonths : 0;
     const totalInvst = takenByThisMonth ? -(pendingMonth * committee.monthlyAmount) : committee.monthlyAmount * idx;
 
