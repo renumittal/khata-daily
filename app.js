@@ -553,11 +553,17 @@ function renderAnalysisPerson() {
       </div>
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Committee</th><th>Status</th><th>Members</th><th>Total pot</th><th>Start</th><th>Taken</th></tr></thead>
+          <thead><tr><th>Committee</th><th>Status</th><th>Members</th><th>Total pot</th><th>Start</th><th>Taken</th><th>Total Invst</th></tr></thead>
           <tbody>
             ${list.map((c) => {
               const inst = instalmentsByNo.get(c.no);
               const taken = inst && inst.isTaken === 'Yes';
+              // Same figure and sign convention as the "Total Invst" column on
+              // the Aug-26-style calendar-month rollup sheets, but as of today
+              // rather than a saved calendar month — negative (still owed back
+              // to the owner) shown in red, positive (still invested with the
+              // pot) in green, via the same owed/owing classes as the balance pill.
+              const invst = currentNetInvst(c, inst);
               return `
               <tr>
                 <td>#${escapeHtml(c.no)}</td>
@@ -566,6 +572,7 @@ function renderAnalysisPerson() {
                 <td>${currency(c.totalAmount)}</td>
                 <td>${c.startMonth ? formatDate(c.startMonth) : '—'}</td>
                 <td>${taken ? `Yes (${escapeHtml(formatMonth(inst.takenMonth))})` : 'No'}</td>
+                <td class="${invst > 0 ? 'invst-owed' : invst < 0 ? 'invst-owing' : ''}">${currency(invst)}</td>
               </tr>`;
             }).join('')}
           </tbody>

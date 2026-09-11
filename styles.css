@@ -997,6 +997,16 @@ dialog::backdrop {
     margin-bottom: 10px;
 }
 
+.invst-owed {
+    color: var(--green);
+    font-weight: 700;
+}
+
+.invst-owing {
+    color: var(--red);
+    font-weight: 700;
+}
+
 @media (max-width: 430px) {
     .app-shell {
         width:min(100% - 22px,620px);
