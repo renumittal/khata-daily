@@ -327,7 +327,6 @@ function renderMonthHistory() {
         <td>${m.ghata || m.boliDate ? currency(m.ghata) : '—'}</td>
         <td>${m.ghata || m.boliDate ? currency(m.kist) : '—'}</td>
         <td>${m.takenBy ? `Yes<br><small>${currency(m.amountReceived)}</small>` : 'No'}</td>
-        <td></td>
       </tr>`;
     }
     const record = committeeInstalments[0];
@@ -339,9 +338,9 @@ function renderMonthHistory() {
       <td><input class="ghata-input" type="number" min="0" value="${m.ghata || ''}"></td>
       <td class="kist-cell">${currency(kistFor(committee, m.ghata))}</td>
       <td><select class="taken-select"><option ${!takenSelected ? 'selected' : ''}>No</option><option ${takenSelected ? 'selected' : ''}>Yes</option></select></td>
-      <td><button class="text-button save-row-btn" type="button">Save</button></td>
     </tr>`;
   }).join('');
+  $('saveMonthsButton').hidden = !editable.length;
 }
 
 function renderCommitteeInfo() {
@@ -351,25 +350,40 @@ function renderCommitteeInfo() {
     : 'Pick a committee to see its details.';
 }
 
-async function saveCommitteeMonthRow(row) {
+// One shared button saves every filled-in open row together, and the table
+// only refreshes once at the end — saving each row separately used to reload
+// the whole table after every click, wiping out whatever was still typed
+// (but not yet saved) in the other open rows.
+async function saveCommitteeMonths() {
   const no = selectedCommitteeNo;
-  const month = row.dataset.month;
-  if (!no || !month) return;
   const committee = committeeByNo(no);
-  const ghata = Number(row.querySelector('.ghata-input').value) || 0;
-  const minGhata = sarkariGhataFor(committee, month);
-  if (minGhata !== '' && ghata < minGhata) {
-    showToast(`${formatMonth(month)}: GHATA can't be less than the Sarkari minimum of ${currency(minGhata)}`);
-    return;
+  const rows = [...document.querySelectorAll('#monthHistory tr[data-month]')]
+    .filter((row) => row.querySelector('.ghata-input').value.trim() !== '');
+  if (!rows.length) { showToast('Enter GHATA for at least one month first'); return; }
+
+  for (const row of rows) {
+    const month = row.dataset.month;
+    const ghata = Number(row.querySelector('.ghata-input').value) || 0;
+    const minGhata = sarkariGhataFor(committee, month);
+    if (minGhata !== '' && ghata < minGhata) {
+      showToast(`${formatMonth(month)}: GHATA can't be less than the Sarkari minimum of ${currency(minGhata)}`);
+      return;
+    }
   }
-  const taken = row.querySelector('.taken-select').value;
-  // This one does more sheet work server-side (updating the committee's whole
-  // month timeline) than other calls, so it gets a longer timeout margin.
-  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken }, 25000);
-  if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
-  showToast(taken === 'Yes'
-    ? `${formatMonth(month)}: marked as taken — KIST ${currency(response.kist)}/member`
-    : `${formatMonth(month)} saved — KIST ${currency(response.kist)}/member`);
+
+  let saved = 0;
+  for (const row of rows) {
+    const month = row.dataset.month;
+    const ghata = Number(row.querySelector('.ghata-input').value) || 0;
+    const taken = row.querySelector('.taken-select').value;
+    // This one does more sheet work server-side (updating the committee's whole
+    // month timeline) than other calls, so it gets a longer timeout margin.
+    const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken }, 25000);
+    if (response && response.ok) saved++;
+  }
+  showToast(saved === rows.length
+    ? `${saved} month${saved > 1 ? 's' : ''} saved`
+    : `Saved ${saved} of ${rows.length} months — check the connection and try the rest again`);
   await Promise.all([loadCommitteeMonths(), loadCommitteeInstalments()]);
 }
 
@@ -604,21 +618,15 @@ $('instCommitteeSelect').addEventListener('change', (event) => {
   loadCommitteeInstalments();
   loadCommitteeMonths();
 });
-// The GHATA input is re-created on every render (it lives inside the History
-// table's open row), so this has to be delegated from a stable ancestor.
-// Rows are re-created on every render, so GHATA input and Save clicks are
-// delegated from the table body instead of bound to specific elements.
+// Rows are re-created on every render (they live inside the History table's
+// open rows), so this has to be delegated from a stable ancestor.
 $('monthHistory').addEventListener('input', (event) => {
   if (!event.target.classList.contains('ghata-input')) return;
   const committee = committeeByNo(selectedCommitteeNo);
   const kist = kistFor(committee, Number(event.target.value) || 0);
   event.target.closest('tr').querySelector('.kist-cell').textContent = currency(kist);
 });
-$('monthHistory').addEventListener('click', (event) => {
-  const button = event.target.closest('.save-row-btn');
-  if (!button) return;
-  saveCommitteeMonthRow(button.closest('tr'));
-});
+$('saveMonthsButton').addEventListener('click', saveCommitteeMonths);
 $('addPersonButton').addEventListener('click', addPerson);
 $('newPersonName').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addPerson(); } });
 $('managePeopleList').addEventListener('click', (event) => {
