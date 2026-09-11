@@ -15,7 +15,6 @@ let committeeMonths = [];
 let selectedCommitteeNo = null;
 let committeeSub = 'list';
 
-function currentYYYYMM() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function formatMonth(yyyyMm) {
   if (!yyyyMm) return '';
   const [y, m] = yyyyMm.split('-').map(Number);
@@ -51,12 +50,6 @@ function committeeByNo(no) { return committees.find((c) => c.no === no); }
 function committeeEndDate(committee) {
   if (!committee || !committee.startMonth || !committee.totalMonths) return '';
   return addMonthsToDate(committee.startMonth, committee.totalMonths - 1);
-}
-function pendingMonthsFor(committee) {
-  if (!committee || !committee.totalMonths) return '';
-  const idx = monthIndexFor(committee, currentYYYYMM());
-  if (idx === null) return '';
-  return Math.max(0, Math.min(committee.totalMonths, committee.totalMonths - idx));
 }
 // The floor GHATA for a given month: TotalMembers × MonthlyAmount × Cut% × (months
 // remaining after this one). The boli/auction discount actually entered that month
@@ -376,11 +369,6 @@ async function saveCommitteeMonth() {
 // whether (and which month) they took the pot. Refreshes the stat boxes and
 // pre-selects "Taken by me this month?" to match the currently picked month.
 function renderCommitteeInstalments() {
-  const committee = committeeByNo(selectedCommitteeNo);
-  const record = committeeInstalments[0];
-  const pending = pendingMonthsFor(committee);
-  $('sumPending').textContent = pending === '' ? '—' : pending;
-  $('sumTaken').textContent = record && record.isTaken === 'Yes' ? `Yes (${formatMonth(record.takenMonth)})` : 'Not yet';
   updateMonthPreview();
   renderMonthHistory();
 }
