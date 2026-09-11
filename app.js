@@ -324,7 +324,7 @@ function renderMonthView() {
     if (r.filled) {
       return `
       <tr class="${r.isTaken === 'Yes' ? 'month-taken' : ''}">
-        <td>#${escapeHtml(r.no)}</td>
+        <td>${escapeHtml(committeeLabel(r.no))}</td>
         <td>${r.installmentNo}/${r.totalMonth}</td>
         <td>${boliDate ? formatDate(boliDate) : '—'}</td>
         <td>${currency(r.sarkari)}</td>
@@ -335,7 +335,7 @@ function renderMonthView() {
     }
     return `
     <tr class="month-open" data-no="${escapeHtml(r.no)}">
-      <td>#${escapeHtml(r.no)}</td>
+      <td>${escapeHtml(committeeLabel(r.no))}</td>
       <td>${r.installmentNo}/${r.totalMonth}</td>
       <td>${boliDate ? formatDate(boliDate) : '—'}</td>
       <td>${currency(r.sarkari)}</td>
@@ -418,7 +418,7 @@ function renderCommitteeVerifyList() {
   $('committeeVerifyList').innerHTML = sorted.map((m, index) => `
     <tr class="cv-row" data-index="${index}">
       <td><input type="checkbox" class="verify-include" checked></td>
-      <td>#${escapeHtml(m.no)}</td>
+      <td>${escapeHtml(committeeLabel(m.no))}</td>
       <td>${escapeHtml(formatMonth(m.month))}</td>
       <td><input class="cv-ghata-input" type="number" min="0" value="${m.ghata || ''}"></td>
       <td><select class="cv-taken-select"><option ${m.takenBy ? '' : 'selected'}>No</option><option ${m.takenBy ? 'selected' : ''}>Yes</option></select></td>
@@ -456,9 +456,27 @@ function switchAnalysisReport(report) {
 async function loadCommitteeAnalysis() {
   const response = await committeeRequest({ action: 'committeeAnalysis' });
   if (!response || !response.ok) { showToast('Could not load analysis — check the committee connection'); return; }
+  committees = response.committees || [];
   analysisData = { committees: response.committees || [], instalments: response.instalments || [], months: response.months || [] };
   renderAnalysisMonth();
   renderAnalysisPerson();
+}
+
+// Committee identifiers embed their start date (e.g. "Vijay (1 Apr 2025)")
+// to stay unique across a person's several committees, but next to an actual
+// Boli Date column that reads as a second, unrelated date and confuses more
+// than it helps. Show a plain per-person ordinal instead, ranked by start
+// date so it stays stable — everywhere a date column already carries the
+// real date for that row (Fill, Verify, Analysis), not in Manage where the
+// full identifier is the whole point.
+function committeeLabel(no) {
+  const person = personOf(no);
+  const siblings = committees
+    .filter((c) => personOf(c.no).toLowerCase() === person.toLowerCase())
+    .slice()
+    .sort((a, b) => (a.startMonth || '').localeCompare(b.startMonth || '') || a.no.localeCompare(b.no));
+  const ordinal = siblings.findIndex((c) => c.no === no) + 1;
+  return ordinal > 0 ? `${person} #${ordinal}` : person;
 }
 
 // One row per committee per month across every committee, grouped by calendar
@@ -501,7 +519,7 @@ function renderAnalysisMonth() {
               const potAmount = committee ? committee.totalAmount - r.ghata : null;
               return `
               <tr class="${r.takenBy ? 'month-taken' : ''}">
-                <td>#${escapeHtml(r.no)}</td>
+                <td>${escapeHtml(committeeLabel(r.no))}</td>
                 <td>${r.boliDate ? formatDate(r.boliDate) : '—'}</td>
                 <td>${currency(r.ghata)}</td>
                 <td>${currency(r.kist)}</td>
@@ -613,7 +631,7 @@ function renderAnalysisPerson() {
               const kistNo = lastFilledKistNo(c);
               return `
               <tr>
-                <td>#${escapeHtml(c.no)}</td>
+                <td>${escapeHtml(committeeLabel(c.no))}</td>
                 <td>${kistNo !== null ? `${kistNo}/${c.totalMonths}` : '—'}</td>
                 <td>${currencyLakhs(c.totalAmount)}</td>
                 <td>${c.startMonth ? formatDate(c.startMonth) : '—'}</td>
@@ -655,6 +673,18 @@ async function loadCommittees() {
 // " #2"-style suffix after the date doesn't get stuck to the person's name.
 function personOf(no) { return String(no || '').replace(/\s*\(.*/, ''); }
 
+// The bracketed date in a committee's stored "no" (e.g. "Vijay (1 Jan
+// 2026)") is frozen at creation time — if the Start date is ever corrected
+// afterward, that bracket silently drifts from the live boli date shown
+// right below it in the meta line. Rebuild it from the committee's current
+// startMonth instead of trusting the stored "no" string, so it can't go
+// stale; only the " #2"-style de-dupe suffix (if any) is kept from "no".
+function committeeDisplayName(c) {
+  const suffix = (c.no.match(/#\d+$/) || [''])[0];
+  const dateLabel = c.startMonth ? formatDate(c.startMonth) : '';
+  return `${personOf(c.no)}${dateLabel ? ` (${dateLabel})` : ''}${suffix ? ` ${suffix}` : ''}`;
+}
+
 function renderCommittees() {
   $('committeeEmpty').hidden = committees.length > 0;
   $('committeeEmpty').querySelector('p').textContent = 'No committees yet';
@@ -662,7 +692,7 @@ function renderCommittees() {
     <div class="person-summary-row committee-row" data-no="${escapeHtml(c.no)}">
       <div class="person-avatar">${escapeHtml(personOf(c.no).charAt(0).toUpperCase())}</div>
       <div class="person-summary-main">
-        <div class="person-summary-name">Committee #${escapeHtml(c.no)}</div>
+        <div class="person-summary-name">Committee #${escapeHtml(committeeDisplayName(c))}</div>
         <div class="person-summary-meta">${c.totalMembers} members · ${c.totalMonths} months · ${currency(c.monthlyAmount)}/month${c.startMonth ? ` · ${escapeHtml(formatDate(c.startMonth))} → ${escapeHtml(formatDate(committeeEndDate(c)))}` : ''}</div>
       </div>
       <div class="person-summary-balance ${c.status === 'Closed' ? 'owing' : 'owed'}"><small>${escapeHtml(c.status || 'Running')}</small></div>
@@ -692,7 +722,7 @@ function boliDateFor(committee, monthYYYYMM) {
 
 function populateCommitteeSelect(preselectNo) {
   const sel = $('instCommitteeSelect');
-  sel.innerHTML = committees.map((c) => `<option value="${escapeHtml(c.no)}">Committee #${escapeHtml(c.no)}</option>`).join('');
+  sel.innerHTML = committees.map((c) => `<option value="${escapeHtml(c.no)}">Committee #${escapeHtml(committeeDisplayName(c))}</option>`).join('');
   if (preselectNo) sel.value = preselectNo;
   selectedCommitteeNo = sel.value || null;
   renderCommitteeInfo();
@@ -772,7 +802,7 @@ function renderMonthHistory() {
 
 function renderCommitteeInfo() {
   const committee = committeeByNo(selectedCommitteeNo);
-  $('m_committeeInfo').textContent = committee ? `Committee #${committee.no}` : 'Pick a committee to see its details.';
+  $('m_committeeInfo').textContent = committee ? `Committee #${committeeDisplayName(committee)}` : 'Pick a committee to see its details.';
   $('m_committeeFacts').hidden = !committee;
   if (!committee) return;
   $('cf_members').textContent = committee.totalMembers;
