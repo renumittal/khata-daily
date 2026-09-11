@@ -210,6 +210,19 @@ function ensureCommitteeMonthRows_(committee) {
   }
 }
 
+// All months across every committee in one call (tagged with which committee
+// each row belongs to) — used by the Analysis tab so it doesn't need one
+// round-trip per committee just to build its month-wise report.
+function readAllCommitteeMonths_() {
+  const months = [];
+  readCommittees_().forEach((committee) => {
+    readCommitteeMonths_(committee.no).forEach((row) => {
+      months.push(Object.assign({ no: committee.no, person: personOf_(committee.no) }, row));
+    });
+  });
+  return months;
+}
+
 function readCommitteeMonths_(committeeNo) {
   const sheet = getCommitteeSheetByNo_(committeeNo);
   const lastRow = sheet.getLastRow();

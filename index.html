@@ -106,6 +106,7 @@
         <button type="button" class="type-option active" data-csub="list">List</button>
         <button type="button" class="type-option" data-csub="add">Add new</button>
         <button type="button" class="type-option" data-csub="instalments">Instalments</button>
+        <button type="button" class="type-option" data-csub="analysis">Analysis</button>
       </div>
 
       <div class="committee-sub" id="committeeSub-list">
@@ -157,6 +158,23 @@
         <div class="empty-state" id="monthHistoryEmpty" hidden><span>◈</span><p>No months yet</p><small>Add the committee's Start date to generate its month rows.</small></div>
         <button class="primary-button" type="button" id="saveMonthsButton" hidden>Save these months</button>
         <div class="empty-state" id="m_openEmpty" hidden><span>✓</span><p>All caught up</p><small>No unfilled months up to the current one.</small></div>
+      </div>
+
+      <div class="committee-sub" id="committeeSub-analysis" hidden>
+        <div class="type-switch" role="group" aria-label="Analysis reports">
+          <button type="button" class="type-option active" data-areport="month">Month wise</button>
+          <button type="button" class="type-option" data-areport="person">Person wise</button>
+        </div>
+
+        <div class="analysis-report" id="analysisReport-month">
+          <div id="analysisMonthList"></div>
+          <div class="empty-state" id="analysisMonthEmpty" hidden><span>◈</span><p>No data yet</p><small>Save some committee months first.</small></div>
+        </div>
+
+        <div class="analysis-report" id="analysisReport-person" hidden>
+          <div id="analysisPersonList"></div>
+          <div class="empty-state" id="analysisPersonEmpty" hidden><span>◈</span><p>No committees yet</p><small>Add a committee first.</small></div>
+        </div>
       </div>
     </section>
   </main>

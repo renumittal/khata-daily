@@ -215,6 +215,15 @@ function doGet(e) {
     return respond(e, { ok: true, months: readCommitteeMonths_(params.no) });
   }
 
+  if (params.action === 'committeeAnalysis') {
+    return respond(e, {
+      ok: true,
+      committees: readCommittees_(),
+      instalments: readCommitteeInstalments_(),
+      months: readAllCommitteeMonths_(),
+    });
+  }
+
   if (params.action === 'saveCommitteeMonth') {
     try {
       const result = saveCommitteeMonth_(params);

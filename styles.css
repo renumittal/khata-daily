@@ -974,6 +974,21 @@ dialog::backdrop {
     box-shadow: inset 0 0 0 1px var(--gold);
 }
 
+.analysis-month-group,
+.analysis-person-group {
+    margin-bottom: 20px;
+}
+
+.analysis-month-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0 0 8px;
+}
+
+.analysis-person-group .person-summary-row {
+    margin-bottom: 10px;
+}
+
 @media (max-width: 430px) {
     .app-shell {
         width:min(100% - 22px,620px);

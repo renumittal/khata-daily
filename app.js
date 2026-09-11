@@ -14,6 +14,8 @@ let committeeInstalments = [];
 let committeeMonths = [];
 let selectedCommitteeNo = null;
 let committeeSub = 'list';
+let analysisData = { committees: [], instalments: [], months: [] };
+let analysisReport = 'month';
 
 function currentYYYYMM() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function formatMonth(yyyyMm) {
@@ -217,13 +219,117 @@ function switchView(view) {
 
 function switchCommitteeSub(sub, preselectNo) {
   committeeSub = sub;
-  ['list', 'add', 'instalments'].forEach((name) => { $(`committeeSub-${name}`).hidden = name !== sub; });
+  ['list', 'add', 'instalments', 'analysis'].forEach((name) => { $(`committeeSub-${name}`).hidden = name !== sub; });
   document.querySelectorAll('.type-switch [data-csub]').forEach((button) => button.classList.toggle('active', button.dataset.csub === sub));
   if (sub === 'add') {
     $('c_no').innerHTML = '<option value="">Pick a person</option>' + people.map((name) => `<option>${escapeHtml(name)}</option>`).join('');
     $('c_existingHint').textContent = '';
   }
   if (sub === 'instalments') populateCommitteeSelect(preselectNo || selectedCommitteeNo);
+  if (sub === 'analysis') loadCommitteeAnalysis();
+}
+
+function switchAnalysisReport(report) {
+  analysisReport = report;
+  ['month', 'person'].forEach((name) => { $(`analysisReport-${name}`).hidden = name !== report; });
+  document.querySelectorAll('.type-switch [data-areport]').forEach((button) => button.classList.toggle('active', button.dataset.areport === report));
+}
+
+async function loadCommitteeAnalysis() {
+  const response = await committeeRequest({ action: 'committeeAnalysis' });
+  if (!response || !response.ok) { showToast('Could not load analysis — check the committee connection'); return; }
+  analysisData = { committees: response.committees || [], instalments: response.instalments || [], months: response.months || [] };
+  renderAnalysisMonth();
+  renderAnalysisPerson();
+}
+
+// One row per committee per month across every committee, grouped by calendar
+// month so it reads like "what happened this month across all committees" —
+// only months that actually have a saved boli/GHATA are shown.
+function renderAnalysisMonth() {
+  const committeesByNo = new Map(analysisData.committees.map((c) => [c.no, c]));
+  const filled = analysisData.months.filter((m) => m.boliDate || m.ghata);
+  const grouped = new Map();
+  filled.forEach((m) => { if (!grouped.has(m.month)) grouped.set(m.month, []); grouped.get(m.month).push(m); });
+  const monthsSorted = [...grouped.keys()].sort().reverse();
+  $('analysisMonthEmpty').hidden = monthsSorted.length > 0;
+  $('analysisMonthList').innerHTML = monthsSorted.map((month) => {
+    const rows = grouped.get(month).slice().sort((a, b) => a.no.localeCompare(b.no));
+    return `
+    <div class="analysis-month-group">
+      <h3 class="analysis-month-title">${escapeHtml(formatMonth(month))}</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Committee</th><th>Boli date</th><th>GHATA</th><th>KIST</th><th>Pot amount</th><th>Taken by</th></tr></thead>
+          <tbody>
+            ${rows.map((r) => {
+              const committee = committeesByNo.get(r.no);
+              const potAmount = committee ? committee.totalAmount - r.ghata : null;
+              return `
+              <tr class="${r.takenBy ? 'month-taken' : ''}">
+                <td>#${escapeHtml(r.no)}</td>
+                <td>${r.boliDate ? formatDate(r.boliDate) : '—'}</td>
+                <td>${currency(r.ghata)}</td>
+                <td>${currency(r.kist)}</td>
+                <td>${potAmount !== null ? currency(potAmount) : '—'}</td>
+                <td>${escapeHtml(r.takenBy || 'No')}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// All committees grouped by the person who runs them — so someone running
+// several committees (e.g. Vijay with 5) sees every one of them under a
+// single group instead of hunting through the flat committee list.
+function renderAnalysisPerson() {
+  const instalmentsByNo = new Map(analysisData.instalments.map((i) => [i.no, i]));
+  const groups = new Map();
+  analysisData.committees.forEach((c) => {
+    const person = personOf(c.no);
+    if (!groups.has(person)) groups.set(person, []);
+    groups.get(person).push(c);
+  });
+  const peopleSorted = [...groups.keys()].sort();
+  $('analysisPersonEmpty').hidden = peopleSorted.length > 0;
+  $('analysisPersonList').innerHTML = peopleSorted.map((person) => {
+    const list = groups.get(person).slice().sort((a, b) => (a.startMonth || '').localeCompare(b.startMonth || ''));
+    const totalPot = list.reduce((sum, c) => sum + (c.totalAmount || 0), 0);
+    const takenCount = list.filter((c) => { const inst = instalmentsByNo.get(c.no); return inst && inst.isTaken === 'Yes'; }).length;
+    return `
+    <div class="analysis-person-group">
+      <div class="person-summary-row">
+        <div class="person-avatar">${escapeHtml(person.charAt(0).toUpperCase())}</div>
+        <div class="person-summary-main">
+          <div class="person-summary-name">${escapeHtml(person)}</div>
+          <div class="person-summary-meta">${list.length} committee${list.length > 1 ? 's' : ''} · ${currency(totalPot)} total · ${takenCount} taken</div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Committee</th><th>Status</th><th>Members</th><th>Total pot</th><th>Start</th><th>Taken</th></tr></thead>
+          <tbody>
+            ${list.map((c) => {
+              const inst = instalmentsByNo.get(c.no);
+              const taken = inst && inst.isTaken === 'Yes';
+              return `
+              <tr>
+                <td>#${escapeHtml(c.no)}</td>
+                <td>${escapeHtml(c.status || 'Running')}</td>
+                <td>${c.totalMembers}</td>
+                <td>${currency(c.totalAmount)}</td>
+                <td>${c.startMonth ? formatDate(c.startMonth) : '—'}</td>
+                <td>${taken ? `Yes (${escapeHtml(formatMonth(inst.takenMonth))})` : 'No'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // Shows any committees the selected person already has, so a second one for
@@ -589,6 +695,7 @@ $('personAddEntryButton').addEventListener('click', () => {
 });
 $('settingsForm').addEventListener('submit', (event) => { event.preventDefault(); localStorage.setItem(ENDPOINT_KEY, $('endpoint').value.trim()); $('settingsDialog').close(); showToast('Connection saved, checking...'); loadPeople(); });
 document.querySelectorAll('.type-switch [data-csub]').forEach((button) => button.addEventListener('click', () => switchCommitteeSub(button.dataset.csub)));
+document.querySelectorAll('.type-switch [data-areport]').forEach((button) => button.addEventListener('click', () => switchAnalysisReport(button.dataset.areport)));
 $('committeeList').addEventListener('click', (event) => {
   const row = event.target.closest('.committee-row');
   if (!row) return;
