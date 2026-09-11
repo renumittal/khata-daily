@@ -474,7 +474,7 @@ function renderAnalysisPerson() {
   // split one person into two groups) — the display name is whichever
   // casing the People list itself uses, falling back to the first seen.
   const groups = new Map();
-  analysisData.committees.forEach((c) => {
+  analysisData.committees.filter((c) => c.status !== 'Closed').forEach((c) => {
     const person = personOf(c.no);
     const key = person.toLowerCase();
     if (!groups.has(key)) groups.set(key, { display: person, committees: [] });
