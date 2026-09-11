@@ -139,40 +139,19 @@
           <div><p class="eyebrow">THIS MONTH</p><h2 style="font-size:15px;margin:0;">Boli / GHATA</h2></div>
         </div>
         <p class="committee-info" id="m_committeeInfo">Loading committee details…</p>
-        <p class="committee-info" id="m_currentMonthLabel"></p>
-        <div id="m_openForm">
-          <div class="field-row">
-            <label>GHATA (₹)<input id="m_ghata" type="number" min="0"></label>
-            <label>Taken by me this month?
-              <select id="m_taken"><option>No</option><option>Yes</option></select>
-            </label>
-          </div>
-          <p class="dialog-copy" id="m_boliDatePreview"></p>
-          <div class="stat-row">
-            <div class="stat-box"><small>Sarkari GHATA</small><strong id="m_sarkariGhata">₹0</strong></div>
-            <div class="stat-box"><small>KIST per member</small><strong id="m_kistPreview">₹0</strong></div>
-          </div>
-          <p class="dialog-copy" id="m_sarkariHint"></p>
-          <p class="dialog-copy" id="m_formula">KIST = Monthly amount − (GHATA ÷ members)</p>
-          <div class="stat-row">
-            <div class="stat-box"><small>Total KIST this month</small><strong id="m_kistTotal">₹0</strong></div>
-          </div>
-          <button class="primary-button" type="button" id="saveMonthButton">Save this month</button>
-        </div>
-        <div class="empty-state" id="m_openEmpty" hidden><span>✓</span><p>All months are filled</p><small>Every month of this committee already has a GHATA entry.</small></div>
-
-        <div class="section-heading compact" style="margin-top:20px;">
-          <div><p class="eyebrow">HISTORY</p><h2 style="font-size:15px;margin:0;">Month by month</h2></div>
-        </div>
+        <p class="dialog-copy" id="m_currentMonthLabel"></p>
         <div class="table-scroll">
           <table>
             <thead>
-              <tr><th>Month</th><th>Boli date</th><th>Sarkari GHATA</th><th>Actual GHATA</th><th>KIST/member</th><th>Taken by</th></tr>
+              <tr><th>Boli date</th><th>Sarkari GHATA</th><th>Actual GHATA</th><th>KIST/member</th><th>Taken</th></tr>
             </thead>
             <tbody id="monthHistory"></tbody>
           </table>
         </div>
-        <div class="empty-state" id="monthHistoryEmpty" hidden><span>◈</span><p>No months saved yet</p><small>Save a month above to start the history.</small></div>
+        <div class="empty-state" id="monthHistoryEmpty" hidden><span>◈</span><p>No months yet</p><small>Add the committee's Start date to generate its month rows.</small></div>
+        <p class="dialog-copy" id="m_sarkariHint"></p>
+        <button class="primary-button" type="button" id="saveMonthButton">Save this month</button>
+        <div class="empty-state" id="m_openEmpty" hidden><span>✓</span><p>All months are filled</p><small>Every month of this committee already has a GHATA entry.</small></div>
       </div>
     </section>
   </main>

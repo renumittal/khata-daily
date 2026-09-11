@@ -275,7 +275,6 @@ function populateCommitteeSelect(preselectNo) {
   sel.innerHTML = committees.map((c) => `<option value="${escapeHtml(c.no)}">Committee #${escapeHtml(c.no)}</option>`).join('');
   if (preselectNo) sel.value = preselectNo;
   selectedCommitteeNo = sel.value || null;
-  $('m_ghata').value = '';
   renderCommitteeInfo();
   loadCommitteeInstalments();
   loadCommitteeMonths();
@@ -289,67 +288,81 @@ async function loadCommitteeInstalments() {
 }
 
 async function loadCommitteeMonths() {
-  if (!selectedCommitteeNo) { committeeMonths = []; updateMonthPreview(); renderMonthHistory(); return; }
+  if (!selectedCommitteeNo) { committeeMonths = []; renderMonthHistory(); return; }
   const response = await committeeRequest({ action: 'committeeMonths', no: selectedCommitteeNo });
   committeeMonths = (response && response.months) || [];
-  $('m_ghata').value = '';
-  updateMonthPreview();
   renderMonthHistory();
 }
 
+// The table IS the entry form: every saved month is a plain read-only row, and
+// the single earliest unfilled month renders its Actual GHATA and Taken cells
+// as inputs instead — that's the only thing "Save this month" ever writes to.
 function renderMonthHistory() {
+  const committee = committeeByNo(selectedCommitteeNo);
   const sorted = [...committeeMonths].sort((a, b) => a.month.localeCompare(b.month));
   const open = openMonth();
   $('monthHistoryEmpty').hidden = sorted.length > 0;
-  $('monthHistory').innerHTML = sorted.map((m) => `
-    <tr class="${m.takenBy ? 'month-taken' : ''} ${m.month === open ? 'month-open' : ''}">
-      <td>${escapeHtml(formatMonth(m.month))}</td>
-      <td>${m.boliDate ? formatDate(m.boliDate) : '—'}</td>
+  $('saveMonthButton').hidden = !open;
+  $('m_openEmpty').hidden = !!open || !sorted.length;
+  $('m_currentMonthLabel').textContent = '';
+
+  $('monthHistory').innerHTML = sorted.map((m) => {
+    if (m.month !== open) {
+      return `
+      <tr class="${m.takenBy ? 'month-taken' : ''}">
+        <td>${m.boliDate ? formatDate(m.boliDate) : '—'}</td>
+        <td>${currency(m.sarkariGhata)}</td>
+        <td>${m.ghata || m.boliDate ? currency(m.ghata) : '—'}</td>
+        <td>${m.ghata || m.boliDate ? currency(m.kist) : '—'}</td>
+        <td>${m.takenBy ? `Yes<br><small>${currency(m.amountReceived)}</small>` : 'No'}</td>
+      </tr>`;
+    }
+    const monthIndex = monthIndexFor(committee, m.month);
+    if (committee && monthIndex !== null) {
+      $('m_currentMonthLabel').textContent = `Filling: ${formatMonth(m.month)} (month ${monthIndex} of ${committee.totalMonths})`;
+    }
+    const record = committeeInstalments[0];
+    const takenSelected = record && record.isTaken === 'Yes' && record.takenMonth === m.month;
+    const boliDate = boliDateFor(committee, m.month);
+    return `
+    <tr class="month-open">
+      <td>${boliDate ? formatDate(boliDate) : '—'}</td>
       <td>${currency(m.sarkariGhata)}</td>
-      <td>${m.ghata || m.boliDate ? currency(m.ghata) : '—'}</td>
-      <td>${m.ghata || m.boliDate ? currency(m.kist) : '—'}</td>
-      <td>${m.takenBy ? `${escapeHtml(m.takenBy)}<br><small>${currency(m.amountReceived)}</small>` : '—'}</td>
-    </tr>`).join('');
+      <td><input id="m_ghata" type="number" min="0" value="${m.ghata || ''}"></td>
+      <td id="m_kistCell">${currency(kistFor(committee, m.ghata))}</td>
+      <td><select id="m_taken"><option ${!takenSelected ? 'selected' : ''}>No</option><option ${takenSelected ? 'selected' : ''}>Yes</option></select></td>
+    </tr>`;
+  }).join('');
+  updateMonthPreview();
 }
 
 function renderCommitteeInfo() {
   const committee = committeeByNo(selectedCommitteeNo);
   $('m_committeeInfo').textContent = committee
-    ? `Committee #${committee.no}: ${committee.totalMembers} members, ${currency(committee.monthlyAmount)}/month, total pot ${currency(committee.totalAmount)}${committee.startMonth ? `, runs ${formatDate(committee.startMonth)} → ${formatDate(committeeEndDate(committee))}` : ''}.`
+    ? `Committee #${committee.no}: ${committee.totalMembers} members, ${currency(committee.monthlyAmount)}/month, total pot ${currency(committee.totalAmount)}, cut ${committee.cutPercent}%/month${committee.startMonth ? `, runs ${formatDate(committee.startMonth)} → ${formatDate(committeeEndDate(committee))}` : ''}.`
     : 'Pick a committee to see its details.';
 }
 
+// Live-updates the KIST cell and the Sarkari-floor hint as GHATA is typed into
+// the open row. Never touches the GHATA/Taken inputs' own values — those are
+// only ever set once, when the row is rendered.
 function updateMonthPreview() {
-  const committee = committeeByNo(selectedCommitteeNo);
   const month = openMonth();
-  $('m_openForm').hidden = !month;
-  $('m_openEmpty').hidden = !!month || !committeeMonths.length;
-  if (!month) { $('m_currentMonthLabel').textContent = ''; return; }
-
+  if (!month || !$('m_ghata')) { $('m_sarkariHint').textContent = ''; return; }
+  const committee = committeeByNo(selectedCommitteeNo);
   const ghata = Number($('m_ghata').value) || 0;
   const kist = kistFor(committee, ghata);
   const minGhata = sarkariGhataFor(committee, month);
-  const monthIndex = monthIndexFor(committee, month);
-  $('m_currentMonthLabel').textContent = committee && monthIndex !== null
-    ? `Filling: ${formatMonth(month)} (month ${monthIndex} of ${committee.totalMonths})`
-    : `Filling: ${formatMonth(month)}`;
-  $('m_kistPreview').textContent = currency(kist);
-  $('m_kistTotal').textContent = currency(kist * (committee ? committee.totalMembers : 0));
-  $('m_formula').textContent = committee
-    ? `${currency(committee.monthlyAmount)} − (${currency(ghata)} ÷ ${committee.totalMembers} members) = ${currency(kist)} per member`
-    : 'KIST = Monthly amount − (GHATA ÷ members)';
-  $('m_sarkariGhata').textContent = minGhata !== '' ? currency(minGhata) : '₹0';
-  $('m_sarkariHint').textContent = minGhata !== '' ? "Actual GHATA can't be entered lower than the Sarkari minimum above." : '';
-  const boliDate = boliDateFor(committee, month);
-  $('m_boliDatePreview').textContent = boliDate ? `Boli date: ${formatDate(boliDate)}` : '';
-  const record = committeeInstalments[0];
-  $('m_taken').value = record && record.isTaken === 'Yes' && record.takenMonth === month ? 'Yes' : 'No';
+  $('m_kistCell').textContent = currency(kist);
+  $('m_sarkariHint').textContent = minGhata !== ''
+    ? `Sarkari minimum GHATA for this month: ${currency(minGhata)} — actual GHATA can't be entered lower than this.`
+    : '';
 }
 
 async function saveCommitteeMonth() {
   const no = selectedCommitteeNo;
   const month = openMonth();
-  if (!no || !month) { showToast('No open month to fill for this committee'); return; }
+  if (!no || !month || !$('m_ghata')) { showToast('No open month to fill for this committee'); return; }
   const committee = committeeByNo(no);
   const ghata = Number($('m_ghata').value) || 0;
   const minGhata = sarkariGhataFor(committee, month);
@@ -357,19 +370,18 @@ async function saveCommitteeMonth() {
     showToast(`GHATA can't be less than the Sarkari minimum of ${currency(minGhata)}`);
     return;
   }
+  const taken = $('m_taken').value;
   // This one does more sheet work server-side (updating the committee's whole
   // month timeline) than other calls, so it gets a longer timeout margin.
-  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken: $('m_taken').value }, 25000);
+  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken }, 25000);
   if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
-  showToast($('m_taken').value === 'Yes' ? `Marked as taken this month — KIST ${currency(response.kist)}/member` : `KIST set to ${currency(response.kist)} for every member`);
+  showToast(taken === 'Yes' ? `Marked as taken this month — KIST ${currency(response.kist)}/member` : `KIST set to ${currency(response.kist)} for every member`);
   await Promise.all([loadCommitteeMonths(), loadCommitteeInstalments()]);
 }
 
 // The committee has exactly one instalment row — its own person's — tracking
-// whether (and which month) they took the pot. Refreshes the stat boxes and
-// pre-selects "Taken by me this month?" to match the currently picked month.
+// whether (and which month) they took the pot.
 function renderCommitteeInstalments() {
-  updateMonthPreview();
   renderMonthHistory();
 }
 
@@ -594,12 +606,13 @@ $('committeeForm').addEventListener('submit', async (event) => {
 });
 $('instCommitteeSelect').addEventListener('change', (event) => {
   selectedCommitteeNo = event.target.value || null;
-  $('m_ghata').value = '';
   renderCommitteeInfo();
   loadCommitteeInstalments();
   loadCommitteeMonths();
 });
-$('m_ghata').addEventListener('input', updateMonthPreview);
+// The GHATA input is re-created on every render (it lives inside the History
+// table's open row), so this has to be delegated from a stable ancestor.
+$('monthHistory').addEventListener('input', (event) => { if (event.target.id === 'm_ghata') updateMonthPreview(); });
 $('saveMonthButton').addEventListener('click', saveCommitteeMonth);
 $('addPersonButton').addEventListener('click', addPerson);
 $('newPersonName').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addPerson(); } });
