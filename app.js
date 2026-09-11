@@ -351,7 +351,9 @@ async function saveCommitteeMonth() {
     showToast(`GHATA can't be less than the Sarkari minimum of ${currency(minGhata)}`);
     return;
   }
-  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken: $('m_taken').value });
+  // This one does more sheet work server-side (updating the committee's whole
+  // month timeline) than other calls, so it gets a longer timeout margin.
+  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken: $('m_taken').value }, 25000);
   if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
   showToast($('m_taken').value === 'Yes' ? `Marked as taken this month — KIST ${currency(response.kist)}/member` : `KIST set to ${currency(response.kist)} for every member`);
   await Promise.all([loadCommitteeMonths(), loadCommitteeInstalments()]);

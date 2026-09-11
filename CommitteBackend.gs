@@ -233,23 +233,32 @@ function readCommitteeMonths_(committeeNo) {
 // name + the amount they received (total collected = KIST × members), and
 // highlights the row — kept in sync whenever a month or a member's taken
 // month changes.
+// Batched into two range calls total (regardless of how many months the
+// committee has) instead of a few per row — looping with individual
+// getRange().setValues() calls per row was slow enough (each is a network
+// round-trip) to blow past the app's JSONP timeout on longer committees, so
+// the save would finish but the success toast would never arrive in time.
 function applyTakenHighlight_(committee) {
   const sheet = getCommitteeSheetByNo_(committee.no);
   const rows = readCommitteeMonths_(committee.no);
   if (!rows.length) return;
   const members = readCommitteeInstalments_(committee.no);
+  const takenValues = [];
+  const backgrounds = [];
   rows.forEach((r) => {
     const taker = members.find((m) => m.takenMonth === r.month);
-    const rowRange = sheet.getRange(r.row, 1, 1, 7);
     if (taker) {
       const received = r.kist ? r.kist * committee.totalMembers : 0;
-      sheet.getRange(r.row, 6, 1, 2).setValues([[taker.person, received]]);
-      rowRange.setBackground('#d9ead3');
+      takenValues.push([taker.person, received]);
+      backgrounds.push(Array(7).fill('#d9ead3'));
     } else {
-      sheet.getRange(r.row, 6, 1, 2).setValues([['', '']]);
-      rowRange.setBackground(null);
+      takenValues.push(['', '']);
+      backgrounds.push(Array(7).fill(null));
     }
   });
+  const firstRow = rows[0].row;
+  sheet.getRange(firstRow, 6, rows.length, 2).setValues(takenValues);
+  sheet.getRange(firstRow, 1, rows.length, 7).setBackgrounds(backgrounds);
 }
 
 // Saves this month's GHATA (boli) for a committee, derives KIST from it, and
