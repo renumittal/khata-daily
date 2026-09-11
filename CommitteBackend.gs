@@ -248,7 +248,10 @@ function applyTakenHighlight_(committee) {
   rows.forEach((r) => {
     const taker = members.find((m) => m.takenMonth === r.month);
     if (taker) {
-      const received = r.kist ? r.kist * committee.totalMembers : 0;
+      // The pot minus GHATA, not rounded-KIST × members — that loses a few
+      // rupees to rounding (each member's KIST is rounded individually, but
+      // the total pot handed to the taker isn't built up from those roundings).
+      const received = r.boliDate ? (committee.totalAmount - r.ghata) : 0;
       takenValues.push([taker.person, received]);
       backgrounds.push(Array(7).fill('#d9ead3'));
     } else {
@@ -306,7 +309,7 @@ function saveCommitteeMonth_(params) {
   if (params.taken === 'Yes') {
     const cut = (Number(committee.cutPercent) || 0) / 100;
     const sarkari = idx !== null ? Math.round(committee.monthlyAmount - committee.monthlyAmount * cut * (committee.totalMonths - idx)) : 0;
-    saveCommitteeInstalment_({ no, person, isTaken: 'Yes', takenMonth: month, amount: kist * committee.totalMembers, kist, ghata, sarkari, status: 'Taken', pendingMonth });
+    saveCommitteeInstalment_({ no, person, isTaken: 'Yes', takenMonth: month, amount: committee.totalAmount - ghata, kist, ghata, sarkari, status: 'Taken', pendingMonth });
   } else if (!alreadyTakenElsewhere) {
     saveCommitteeInstalment_({ no, person, isTaken: 'No', takenMonth: '', amount: 0, kist, ghata, sarkari: 0, status: '', pendingMonth });
   }
