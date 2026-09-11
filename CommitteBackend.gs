@@ -156,6 +156,21 @@ function saveCommitteeInstalment_(params) {
   refreshPersonNetSheet_(person);
 }
 
+// Corrects a mis-recorded "person" on an existing instalment row (matched by
+// "no" alone, since each committee has exactly one instalment row today) —
+// for fixing data saved before the member-vs-organizer distinction existed,
+// without risking a duplicate row the way re-calling saveCommitteeInstalment_
+// with a different person would (it only matches existing rows by person).
+function renameInstalmentPerson_(no, newPerson) {
+  const sheet = getCommitteeInstalmentsSheet_();
+  const existing = readCommitteeInstalments_(no)[0];
+  if (!existing) throw new Error('No instalment row found for ' + no);
+  sheet.getRange(existing.row, 2).setValue(newPerson);
+  const committee = readCommittees_().find((c) => c.no === no);
+  if (committee) applyTakenHighlight_(committee);
+  refreshPersonNetSheet_(newPerson);
+}
+
 // ---------- Per-committee "Kameti - <person>" sheet ----------
 
 // A committee's "no" is "Person (start date)", optionally with a " #2" style
@@ -178,7 +193,7 @@ function getCommitteeSheetByNo_(no) {
   let sheet = spreadsheet.getSheetByName(name);
   if (!sheet) sheet = spreadsheet.insertSheet(name);
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['Month', 'Boli date', 'Sarkari GHATA', 'Actual GHATA', 'KIST/member', 'Taken by', 'Amount received']);
+    sheet.appendRow(['Month', 'Boli date', 'Sarkari GHATA', 'Actual GHATA', 'KIST/member', 'Taken by', 'Amount received', 'Verified']);
   }
   return sheet;
 }
@@ -223,7 +238,7 @@ function ensureCommitteeMonthRows_(committee) {
   for (let i = 1; i <= committee.totalMonths; i++) {
     const month = addMonthsToYearMonth_(startYM, i - 1);
     if (existingMonths.includes(month)) continue;
-    sheet.appendRow([asText_(month), '', sarkariGhataFor_(committee, month), '', '', '', '']);
+    sheet.appendRow([asText_(month), '', sarkariGhataFor_(committee, month), '', '', '', '', '']);
   }
 }
 
@@ -244,7 +259,7 @@ function readCommitteeMonths_(committeeNo) {
   const sheet = getCommitteeSheetByNo_(committeeNo);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
-  const values = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  const values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
   return values
     .map((row, index) => ({
       row: index + 2,
@@ -255,6 +270,7 @@ function readCommitteeMonths_(committeeNo) {
       kist: Number(row[4]) || 0,
       takenBy: String(row[5] || ''),
       amountReceived: Number(row[6]) || 0,
+      verified: String(row[7] || '').trim().toLowerCase() === 'yes',
     }))
     .filter((entry) => entry.month);
 }
@@ -315,10 +331,14 @@ function saveCommitteeMonth_(params) {
   // was pre-filled with when the row was first created) so it always reflects
   // the committee's current cut%/start date, even if those were fixed later.
   const sarkariGhata = sarkariGhataFor_(committee, month);
+  // Any save through the normal Fill flow re-opens this month for Verify —
+  // only verifyCommitteeMonths_ (params.verified) is allowed to leave it set.
+  const verifiedFlag = params.verified ? 'Yes' : '';
   if (existing) {
     sheet.getRange(existing.row, 2, 1, 4).setValues([[boliDate, sarkariGhata, ghata, kist]]);
+    sheet.getRange(existing.row, 8).setValue(verifiedFlag);
   } else {
-    sheet.appendRow([asText_(month), boliDate, sarkariGhata, ghata, kist, '', '']);
+    sheet.appendRow([asText_(month), boliDate, sarkariGhata, ghata, kist, '', '', verifiedFlag]);
   }
 
   const instSheet = getCommitteeInstalmentsSheet_();
@@ -326,11 +346,15 @@ function saveCommitteeMonth_(params) {
     instSheet.getRange(member.row, 6, 1, 2).setValues([[kist, ghata]]); // KIST (col 6), GHATA (col 7)
   });
 
-  // Sync the committee's own person's taken status. Marking "Yes" this month
-  // always wins; marking "No" only clears a taken record if it was for THIS
-  // same month (i.e. un-marking it) — it never silently erases a taken record
-  // for a different month just because a later month was saved with "No".
-  const person = personOf_(no);
+  // Sync this committee's taken status. Marking "Yes" this month always wins;
+  // marking "No" only clears a taken record if it was for THIS same month
+  // (i.e. un-marking it) — it never silently erases a taken record for a
+  // different month just because a later month was saved with "No".
+  // "person" here is whoever actually WITHDRAWS this slot's pot — e.g. for a
+  // committee Vijay runs but Renu holds a slot in, that's Renu, not Vijay —
+  // so it's passed explicitly (params.member) rather than assumed from the
+  // committee's own name, which only says who the committee is run by/with.
+  const person = String(params.member || '').trim() || personOf_(no);
   const existingRecord = readCommitteeInstalments_(no).find((m) => m.person.toLowerCase() === person.toLowerCase());
   const alreadyTakenElsewhere = existingRecord && existingRecord.isTaken === 'Yes' && existingRecord.takenMonth && existingRecord.takenMonth !== month;
   const idx = monthIndexFor_(committee, month);
@@ -348,6 +372,39 @@ function saveCommitteeMonth_(params) {
   refreshCalendarMonthSheet_(month);
 
   return { ok: true, ghata, kist };
+}
+
+// ---------- Fill / Verify ----------
+//
+// A month saved through the normal Fill flow sits "unverified" (see the
+// Verified column cleared in saveCommitteeMonth_ above) until reviewed here —
+// mirrors the ledger's Detail Transaction verify flow. Only verifyCommitteeMonths_
+// is allowed to set it back to Yes.
+function readAllUnverifiedCommitteeMonths_() {
+  const rows = [];
+  readCommittees_().forEach((committee) => {
+    readCommitteeMonths_(committee.no).forEach((m) => {
+      if ((m.boliDate || m.ghata) && !m.verified) rows.push(Object.assign({ no: committee.no }, m));
+    });
+  });
+  return rows;
+}
+
+// Applies each correction (if any) via the normal save path, then marks that
+// month Verified — same "correct, then confirm" shape as verifyTransactions
+// in Code.gs.
+function verifyCommitteeMonths_(updates) {
+  return updates.map((u) => {
+    const no = String(u.no || '').trim();
+    const month = String(u.month || '').trim();
+    if (!no || !month) return { no, month, ok: false };
+    try {
+      saveCommitteeMonth_({ no, month, ghata: u.ghata, boliDate: u.boliDate, taken: u.taken, member: u.member, verified: true });
+      return { no, month, ok: true };
+    } catch (error) {
+      return { no, month, ok: false };
+    }
+  });
 }
 
 // ---------- Calendar-month rollup ("Jun-26", "Jul-26", "Aug-26", ...) ----------
@@ -412,10 +469,10 @@ function refreshCalendarMonthSheet_(yyyymm) {
       rows.length + 1, committee.no, idx, committee.totalMonths, committee.monthlyAmount,
       ghata, sarkari, extraProfit, totalInvst,
       takenByThisMonth ? 'Yes' : 'No',
-      takenByThisMonth && instalment ? instalment.takenMonth : '',
+      asText_(takenByThisMonth && instalment ? instalment.takenMonth : ''),
       pendingMonth,
       takenByThisMonth ? 'Taken' : '',
-      monthRow ? monthRow.boliDate : '',
+      asText_(monthRow ? monthRow.boliDate : ''),
       filled ? 'Yes' : 'No',
     ]);
   });
@@ -434,7 +491,7 @@ function readCalendarMonth_(yyyymm) {
   return values.map((row) => ({
     srNo: row[0], no: String(row[1] || ''), installmentNo: row[2], totalMonth: row[3], monthlyAmount: row[4],
     ghata: row[5], sarkari: row[6], extraProfit: row[7], totalInvst: row[8], isTaken: String(row[9] || ''),
-    takenMonth: String(row[10] || ''), pendingMonth: row[11], status: String(row[12] || ''),
+    takenMonth: toYearMonthString_(row[10]), pendingMonth: row[11], status: String(row[12] || ''),
     boliDate: toDateString_(row[13]), filled: String(row[14] || '') === 'Yes',
   }));
 }

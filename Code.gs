@@ -241,6 +241,29 @@ function doGet(e) {
     }
   }
 
+  if (params.action === 'unverifiedCommitteeMonths') {
+    return respond(e, { ok: true, months: readAllUnverifiedCommitteeMonths_() });
+  }
+
+  if (params.action === 'verifyCommitteeMonths') {
+    try {
+      const updates = JSON.parse(params.updates || '[]');
+      const results = verifyCommitteeMonths_(updates);
+      return respond(e, { ok: true, results });
+    } catch (error) {
+      return respond(e, { ok: false, error: String(error) });
+    }
+  }
+
+  if (params.action === 'renameInstalmentPerson') {
+    try {
+      renameInstalmentPerson_(params.no, params.newPerson);
+      return respond(e, { ok: true });
+    } catch (error) {
+      return respond(e, { ok: false, error: String(error) });
+    }
+  }
+
   if (params.action === 'personNet') {
     try {
       return respond(e, { ok: true, ...readPersonNet_(params.person) });

@@ -13,11 +13,13 @@ let committees = [];
 let committeeInstalments = [];
 let committeeMonths = [];
 let selectedCommitteeNo = null;
-let committeeSub = 'list';
+let committeeSub = 'month';
+let manageSub = 'list';
 let analysisData = { committees: [], instalments: [], months: [] };
 let analysisReport = 'month';
 let monthViewMonth = null;
 let monthViewRows = [];
+let pendingCommitteeVerification = [];
 
 function currentYYYYMM() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function formatMonth(yyyyMm) {
@@ -216,23 +218,34 @@ function switchView(view) {
   if (view === 'people') { renderPeopleDirectory(); loadTransactions().then(() => { if (!$('peopleView').hidden) renderPeopleDirectory(); }); }
   if (view === 'personDetail') renderPersonDetail();
   if (view === 'verify') loadUnverified();
-  if (view === 'committee') loadCommittees();
+  if (view === 'committee') { loadCommittees(); switchCommitteeSub(committeeSub); loadCommitteeUnverifiedBadge(); }
 }
 
-function switchCommitteeSub(sub, preselectNo) {
+// Top-level Committee flow: Fill (month) -> Verify -> View (analysis), with
+// the committee-management screens (List/Add new/Instalments) tucked under
+// one Manage tab so they're out of the way on a phone day to day.
+function switchCommitteeSub(sub, preselectManageSub) {
   committeeSub = sub;
-  ['list', 'add', 'instalments', 'month', 'analysis'].forEach((name) => { $(`committeeSub-${name}`).hidden = name !== sub; });
-  document.querySelectorAll('.type-switch [data-csub]').forEach((button) => button.classList.toggle('active', button.dataset.csub === sub));
+  ['month', 'verify', 'manage', 'analysis'].forEach((name) => { $(`committeeSub-${name}`).hidden = name !== sub; });
+  document.querySelectorAll('#committeeView > .type-switch [data-csub]').forEach((button) => button.classList.toggle('active', button.dataset.csub === sub));
+  if (sub === 'month') {
+    if (!$('mv_month').value) $('mv_month').value = currentYYYYMM();
+    loadMonthView($('mv_month').value);
+  }
+  if (sub === 'verify') loadCommitteeUnverified();
+  if (sub === 'analysis') loadCommitteeAnalysis();
+  if (sub === 'manage') switchManageSub(preselectManageSub || manageSub);
+}
+
+function switchManageSub(sub, preselectNo) {
+  manageSub = sub;
+  ['list', 'add', 'instalments'].forEach((name) => { $(`manageSub-${name}`).hidden = name !== sub; });
+  document.querySelectorAll('#committeeSub-manage [data-msub]').forEach((button) => button.classList.toggle('active', button.dataset.msub === sub));
   if (sub === 'add') {
     $('c_no').innerHTML = '<option value="">Pick a person</option>' + people.map((name) => `<option>${escapeHtml(name)}</option>`).join('');
     $('c_existingHint').textContent = '';
   }
   if (sub === 'instalments') populateCommitteeSelect(preselectNo || selectedCommitteeNo);
-  if (sub === 'month') {
-    if (!$('mv_month').value) $('mv_month').value = currentYYYYMM();
-    loadMonthView($('mv_month').value);
-  }
-  if (sub === 'analysis') loadCommitteeAnalysis();
 }
 
 // Month-first entry: pick a calendar month, see every committee whose own
@@ -310,13 +323,81 @@ async function saveMonthView() {
     const committee = committeeByNo(no);
     const ghata = Number(row.querySelector('.mv-ghata-input').value) || 0;
     const taken = row.querySelector('.mv-taken-select').value;
-    const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken }, 25000);
+    // "member" is who actually withdraws this slot's pot — currently always
+    // Renu (every committee here is one of her slots in someone else's
+    // kameti); make this a real per-slot field if other people's own slots
+    // get tracked here too.
+    const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken, member: 'Renu' }, 25000);
     if (response && response.ok) saved++;
   }
   showToast(saved === rows.length
     ? `${saved} committee${saved > 1 ? 's' : ''} saved for ${formatMonth(month)}`
     : `Saved ${saved} of ${rows.length} — check the connection and try the rest again`);
   await loadMonthView(month);
+  loadCommitteeUnverifiedBadge();
+}
+
+// Lightweight badge-only refresh — used whenever the Committee tab opens or
+// something is saved, without paying for the full Verify list render unless
+// the user actually goes to that tab.
+async function loadCommitteeUnverifiedBadge() {
+  const response = await committeeRequest({ action: 'unverifiedCommitteeMonths' }, 15000);
+  pendingCommitteeVerification = (response && response.months) || [];
+  updateCommitteeVerifyBadge();
+}
+
+function updateCommitteeVerifyBadge() {
+  const badge = $('committeeVerifyBadge');
+  badge.textContent = pendingCommitteeVerification.length;
+  badge.hidden = pendingCommitteeVerification.length === 0;
+}
+
+async function loadCommitteeUnverified() {
+  const response = await committeeRequest({ action: 'unverifiedCommitteeMonths' }, 15000);
+  if (!response || !response.ok) { $('committeeVerifyCount').textContent = 'Could not load'; return; }
+  pendingCommitteeVerification = response.months || [];
+  updateCommitteeVerifyBadge();
+  renderCommitteeVerifyList();
+}
+
+// Mirrors the ledger's Verify screen: each row is editable (GHATA/Taken) so a
+// mistake made while filling can be caught here before it's confirmed, not
+// just rubber-stamped.
+function renderCommitteeVerifyList() {
+  const sorted = [...pendingCommitteeVerification].sort((a, b) => `${b.month}${a.no}`.localeCompare(`${a.month}${b.no}`));
+  $('committeeVerifyCount').textContent = sorted.length ? `${sorted.length} pending` : 'All caught up';
+  $('committeeVerifyEmpty').hidden = sorted.length > 0;
+  $('committeeVerifySubmitButton').hidden = sorted.length === 0;
+  $('committeeVerifyList').innerHTML = sorted.map((m, index) => `
+    <tr class="cv-row" data-index="${index}">
+      <td><input type="checkbox" class="verify-include" checked></td>
+      <td>#${escapeHtml(m.no)}</td>
+      <td>${escapeHtml(formatMonth(m.month))}</td>
+      <td><input class="cv-ghata-input" type="number" min="0" value="${m.ghata || ''}"></td>
+      <td><select class="cv-taken-select"><option ${m.takenBy ? '' : 'selected'}>No</option><option ${m.takenBy ? 'selected' : ''}>Yes</option></select></td>
+    </tr>`).join('');
+}
+
+async function submitCommitteeVerification() {
+  const updates = [];
+  document.querySelectorAll('#committeeVerifyList .cv-row').forEach((row) => {
+    if (!row.querySelector('.verify-include').checked) return;
+    const m = pendingCommitteeVerification[Number(row.dataset.index)];
+    updates.push({
+      no: m.no, month: m.month,
+      ghata: Number(row.querySelector('.cv-ghata-input').value) || 0,
+      taken: row.querySelector('.cv-taken-select').value,
+      boliDate: m.boliDate || boliDateFor(committeeByNo(m.no), m.month),
+      member: 'Renu',
+    });
+  });
+  if (!updates.length) { showToast('Select at least one month'); return; }
+  $('committeeVerifySubmitButton').disabled = true;
+  const response = await committeeRequest({ action: 'verifyCommitteeMonths', updates: JSON.stringify(updates) }, 25000);
+  $('committeeVerifySubmitButton').disabled = false;
+  if (!response || !response.ok) { showToast('Could not verify — check connection'); return; }
+  showToast(`${updates.length} month(s) verified`);
+  await loadCommitteeUnverified();
 }
 
 function switchAnalysisReport(report) {
@@ -630,13 +711,16 @@ async function saveCommitteeMonths() {
     const taken = row.querySelector('.taken-select').value;
     // This one does more sheet work server-side (updating the committee's whole
     // month timeline) than other calls, so it gets a longer timeout margin.
-    const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken }, 25000);
+    // "member" (who actually withdraws this slot's pot) is always Renu for now — see the
+    // matching comment in saveMonthView.
+    const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken, member: 'Renu' }, 25000);
     if (response && response.ok) saved++;
   }
   showToast(saved === rows.length
     ? `${saved} month${saved > 1 ? 's' : ''} saved`
     : `Saved ${saved} of ${rows.length} months — check the connection and try the rest again`);
   await Promise.all([loadCommitteeMonths(), loadCommitteeInstalments()]);
+  loadCommitteeUnverifiedBadge();
 }
 
 // The committee has exactly one instalment row — its own person's — tracking
@@ -812,12 +896,14 @@ $('personAddEntryButton').addEventListener('click', () => {
   if (card) { card.scrollIntoView({ behavior:'smooth', block:'center' }); card.querySelector('.person-amount').focus(); }
 });
 $('settingsForm').addEventListener('submit', (event) => { event.preventDefault(); localStorage.setItem(ENDPOINT_KEY, $('endpoint').value.trim()); $('settingsDialog').close(); showToast('Connection saved, checking...'); loadPeople(); });
-document.querySelectorAll('.type-switch [data-csub]').forEach((button) => button.addEventListener('click', () => switchCommitteeSub(button.dataset.csub)));
+document.querySelectorAll('#committeeView > .type-switch [data-csub]').forEach((button) => button.addEventListener('click', () => switchCommitteeSub(button.dataset.csub)));
+document.querySelectorAll('#committeeSub-manage [data-msub]').forEach((button) => button.addEventListener('click', () => switchManageSub(button.dataset.msub)));
 document.querySelectorAll('.type-switch [data-areport]').forEach((button) => button.addEventListener('click', () => switchAnalysisReport(button.dataset.areport)));
 $('committeeList').addEventListener('click', (event) => {
   const row = event.target.closest('.committee-row');
   if (!row) return;
-  switchCommitteeSub('instalments', row.dataset.no);
+  switchCommitteeSub('manage');
+  switchManageSub('instalments', row.dataset.no);
 });
 // A committee pays out to one member per month, so months = members; the monthly
 // instalment is the total pot (entered in lakhs) split evenly across members.
@@ -868,7 +954,7 @@ $('committeeForm').addEventListener('submit', async (event) => {
   showToast('Committee saved');
   event.target.reset();
   updateCommitteePreview();
-  switchCommitteeSub('list');
+  switchManageSub('list');
   loadCommittees();
 });
 $('instCommitteeSelect').addEventListener('change', (event) => {
@@ -898,6 +984,7 @@ $('monthViewBody').addEventListener('input', (event) => {
   row.querySelector('.mv-kist-cell').textContent = currency(kistFor(committee, ghata));
 });
 $('saveMonthViewButton').addEventListener('click', saveMonthView);
+$('committeeVerifySubmitButton').addEventListener('click', submitCommitteeVerification);
 $('addPersonButton').addEventListener('click', addPerson);
 $('newPersonName').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addPerson(); } });
 $('managePeopleList').addEventListener('click', (event) => {

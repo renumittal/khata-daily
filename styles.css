@@ -827,6 +827,14 @@ dialog::backdrop {
     position: relative;
 }
 
+.type-option {
+    position: relative;
+}
+
+.cv-row .cv-ghata-input {
+    width: 90px;
+}
+
 .tab-badge {
     position: absolute;
     top: -2px;
