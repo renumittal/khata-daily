@@ -466,6 +466,7 @@ async function loadCommitteeAnalysis() {
 // only months that actually have a saved boli/GHATA are shown.
 function renderAnalysisMonth() {
   const committeesByNo = new Map(analysisData.committees.map((c) => [c.no, c]));
+  const instalmentsByNo = new Map(analysisData.instalments.map((i) => [i.no, i]));
   const filled = analysisData.months.filter((m) => m.boliDate || m.ghata);
   const grouped = new Map();
   filled.forEach((m) => { if (!grouped.has(m.month)) grouped.set(m.month, []); grouped.get(m.month).push(m); });
@@ -473,9 +474,24 @@ function renderAnalysisMonth() {
   $('analysisMonthEmpty').hidden = monthsSorted.length > 0;
   $('analysisMonthList').innerHTML = monthsSorted.map((month) => {
     const rows = grouped.get(month).slice().sort((a, b) => a.no.localeCompare(b.no));
+    // Net position across every committee AS OF this month — same Total Invst
+    // formula/sign convention as the calendar-month rollup sheet (positive =
+    // still invested with the pot, i.e. money to come; negative = future
+    // instalments still owed), summed over every committee filled this month.
+    const monthNetInvst = rows.reduce((sum, r) => {
+      const committee = committeesByNo.get(r.no);
+      if (!committee) return sum;
+      const idx = monthIndexFor(committee, month);
+      if (idx === null) return sum;
+      const instalment = instalmentsByNo.get(r.no);
+      const takenByThisMonth = Boolean(instalment && instalment.isTaken === 'Yes' && instalment.takenMonth && instalment.takenMonth <= month);
+      const pendingMonth = committee.totalMonths - idx;
+      const invst = takenByThisMonth ? -(pendingMonth * committee.monthlyAmount) : committee.monthlyAmount * idx;
+      return sum + invst;
+    }, 0);
     return `
     <div class="analysis-month-group">
-      <h3 class="analysis-month-title">${escapeHtml(formatMonth(month))}</h3>
+      <h3 class="analysis-month-title">${escapeHtml(formatMonth(month))} <span class="${monthNetInvst > 0 ? 'invst-owed' : monthNetInvst < 0 ? 'invst-owing' : ''}">${monthNetInvst >= 0 ? '+' : ''}${currencyLakhs(monthNetInvst)}</span></h3>
       <div class="table-scroll">
         <table>
           <thead><tr><th>Committee</th><th>Boli date</th><th>GHATA</th><th>KIST</th><th>Pot amount</th><th>Taken</th></tr></thead>

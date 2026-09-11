@@ -1001,6 +1001,10 @@ dialog::backdrop {
 }
 
 .analysis-month-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
     font-size: 13px;
     font-weight: 700;
     margin: 0 0 8px;
