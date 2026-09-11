@@ -87,6 +87,9 @@ function allEntries() {
 
 const $ = (id) => document.getElementById(id);
 const currency = (value) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(value);
+// A short "₹5.50L" form for wide tables (e.g. the Analysis person-wise
+// report) where full rupee figures push the table into horizontal scroll.
+const currencyLakhs = (value) => `${value < 0 ? '-' : ''}₹${(Math.abs(value) / 100000).toFixed(2)}L`;
 const today = () => new Date().toISOString().slice(0, 10);
 
 function render() {
@@ -553,7 +556,7 @@ function renderAnalysisPerson() {
       </div>
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Committee</th><th>Kist #</th><th>Status</th><th>Members</th><th>Total pot</th><th>Start</th><th>Taken</th><th>Total Invst</th></tr></thead>
+          <thead><tr><th>Committee</th><th>Kist #</th><th>Status</th><th>Members</th><th>Total pot (L)</th><th>Start</th><th>Taken</th><th>Total Invst (L)</th></tr></thead>
           <tbody>
             ${list.map((c) => {
               const inst = instalmentsByNo.get(c.no);
@@ -576,10 +579,10 @@ function renderAnalysisPerson() {
                 <td>${kistNo !== null ? `${kistNo}/${c.totalMonths}` : '—'}</td>
                 <td>${escapeHtml(c.status || 'Running')}</td>
                 <td>${c.totalMembers}</td>
-                <td>${currency(c.totalAmount)}</td>
+                <td>${currencyLakhs(c.totalAmount)}</td>
                 <td>${c.startMonth ? formatDate(c.startMonth) : '—'}</td>
                 <td>${taken ? `Yes (${escapeHtml(formatMonth(inst.takenMonth))})` : 'No'}</td>
-                <td class="${invst > 0 ? 'invst-owed' : invst < 0 ? 'invst-owing' : ''}">${currency(invst)}</td>
+                <td class="${invst > 0 ? 'invst-owed' : invst < 0 ? 'invst-owing' : ''}">${currencyLakhs(invst)}</td>
               </tr>`;
             }).join('')}
           </tbody>
