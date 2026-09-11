@@ -260,14 +260,17 @@ function renderCommittees() {
     </div>`).join('');
 }
 
+// The month a GHATA entry belongs to is just the year+month of its Boli date —
+// no separate "month" input needed.
+function boliMonth() { return $('m_boliDate').value.slice(0, 7); }
+
 function populateCommitteeSelect(preselectNo) {
   const sel = $('instCommitteeSelect');
   sel.innerHTML = committees.map((c) => `<option value="${escapeHtml(c.no)}">Committee #${escapeHtml(c.no)}</option>`).join('');
   if (preselectNo) sel.value = preselectNo;
   selectedCommitteeNo = sel.value || null;
-  $('m_month').value = currentYYYYMM();
+  $('m_boliDate').value = today();
   $('m_ghata').value = '';
-  $('m_boliDate').value = '';
   renderCommitteeInfo();
   loadCommitteeInstalments();
   loadCommitteeMonths();
@@ -284,9 +287,9 @@ async function loadCommitteeMonths() {
   if (!selectedCommitteeNo) { committeeMonths = []; updateMonthPreview(); renderMonthHistory(); return; }
   const response = await committeeRequest({ action: 'committeeMonths', no: selectedCommitteeNo });
   committeeMonths = (response && response.months) || [];
-  const existing = committeeMonths.find((m) => m.month === $('m_month').value);
+  const existing = committeeMonths.find((m) => m.month === boliMonth());
   $('m_ghata').value = existing ? existing.ghata : '';
-  $('m_boliDate').value = existing ? existing.boliDate : '';
+  if (existing && existing.boliDate) $('m_boliDate').value = existing.boliDate;
   updateMonthPreview();
   renderMonthHistory();
 }
@@ -316,7 +319,7 @@ function updateMonthPreview() {
   const committee = committeeByNo(selectedCommitteeNo);
   const ghata = Number($('m_ghata').value) || 0;
   const kist = kistFor(committee, ghata);
-  const minGhata = sarkariGhataFor(committee, $('m_month').value);
+  const minGhata = sarkariGhataFor(committee, boliMonth());
   $('m_kistPreview').textContent = currency(kist);
   $('m_kistTotal').textContent = currency(kist * (committee ? committee.totalMembers : 0));
   $('m_formula').textContent = committee
@@ -327,8 +330,8 @@ function updateMonthPreview() {
 
 async function saveCommitteeMonth() {
   const no = selectedCommitteeNo;
-  const month = $('m_month').value;
-  if (!no || !month) { showToast('Pick a committee and month'); return; }
+  const month = boliMonth();
+  if (!no || !month) { showToast('Pick a committee and Boli date'); return; }
   const committee = committeeByNo(no);
   const ghata = Number($('m_ghata').value) || 0;
   const minGhata = sarkariGhataFor(committee, month);
@@ -614,14 +617,13 @@ $('committeeForm').addEventListener('submit', async (event) => {
 });
 $('instCommitteeSelect').addEventListener('change', (event) => {
   selectedCommitteeNo = event.target.value || null;
-  $('m_month').value = currentYYYYMM();
+  $('m_boliDate').value = today();
   $('m_ghata').value = '';
-  $('m_boliDate').value = '';
   renderCommitteeInfo();
   loadCommitteeInstalments();
   loadCommitteeMonths();
 });
-$('m_month').addEventListener('change', loadCommitteeMonths);
+$('m_boliDate').addEventListener('change', loadCommitteeMonths);
 $('m_ghata').addEventListener('input', updateMonthPreview);
 $('saveMonthButton').addEventListener('click', saveCommitteeMonth);
 $('instList').addEventListener('click', (event) => {
