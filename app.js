@@ -15,6 +15,7 @@ let committeeMonths = [];
 let selectedCommitteeNo = null;
 let committeeSub = 'list';
 
+function currentYYYYMM() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function formatMonth(yyyyMm) {
   if (!yyyyMm) return '';
   const [y, m] = yyyyMm.split('-').map(Number);
@@ -249,14 +250,14 @@ function renderCommittees() {
     </div>`).join('');
 }
 
-// The only month that's ever editable is the earliest one that hasn't been
-// filled in yet — no free month picker, so already-entered/confirmed months
-// can't be accidentally overwritten. Returns null once every month is filled.
-function openMonth() {
-  const unfilled = committeeMonths.filter((m) => !m.ghata && !m.boliDate).sort((a, b) => a.month.localeCompare(b.month));
-  return unfilled.length ? unfilled[0].month : null;
+// Every unfilled month up to and including the current calendar month is
+// editable at once (not just the single earliest one) — needed to backfill
+// several months of an existing committee's history in one sitting. Months
+// beyond today stay locked, since that GHATA hasn't happened yet.
+function editableMonths() {
+  const today = currentYYYYMM();
+  return committeeMonths.filter((m) => !(m.ghata || m.boliDate) && m.month <= today).map((m) => m.month).sort();
 }
-function boliMonth() { return openMonth() || ''; }
 // The exact Boli date is inferred from the committee's start date's day-of-month
 // applied to whichever month is picked — the day only needs to be set once, on
 // the committee itself, not re-entered every month. Clamped for short months
@@ -300,21 +301,25 @@ async function loadCommitteeMonths() {
 function renderMonthHistory() {
   const committee = committeeByNo(selectedCommitteeNo);
   const sorted = [...committeeMonths].sort((a, b) => a.month.localeCompare(b.month));
-  const open = openMonth();
+  const editable = editableMonths();
   $('monthHistoryEmpty').hidden = sorted.length > 0;
-  $('saveMonthButton').hidden = !open;
-  $('m_openEmpty').hidden = !!open || !sorted.length;
-  $('m_currentMonthLabel').textContent = '';
+  $('m_openEmpty').hidden = editable.length > 0 || !sorted.length;
+  $('m_currentMonthLabel').textContent = editable.length
+    ? `${editable.length} month${editable.length > 1 ? 's' : ''} need GHATA entries: ${editable.map(formatMonth).join(', ')}`
+    : '';
 
   // Sarkari GHATA and Boli date are pure functions of the committee's own
   // numbers (cut%, start date) and don't depend on anything being saved yet —
   // compute them fresh client-side for every row instead of trusting
   // whatever the sheet happened to have (which for never-touched future rows
   // is just whatever the committee looked like the moment it was created).
+  // Every unfilled month up to the current calendar month is editable at
+  // once, not just one at a time, so an existing committee's backlog of
+  // months can be entered in one sitting.
   $('monthHistory').innerHTML = sorted.map((m) => {
     const sarkariGhata = sarkariGhataFor(committee, m.month);
     const boliDate = m.boliDate || boliDateFor(committee, m.month);
-    if (m.month !== open) {
+    if (!editable.includes(m.month)) {
       return `
       <tr class="${m.takenBy ? 'month-taken' : ''}">
         <td>${boliDate ? formatDate(boliDate) : '—'}</td>
@@ -322,24 +327,21 @@ function renderMonthHistory() {
         <td>${m.ghata || m.boliDate ? currency(m.ghata) : '—'}</td>
         <td>${m.ghata || m.boliDate ? currency(m.kist) : '—'}</td>
         <td>${m.takenBy ? `Yes<br><small>${currency(m.amountReceived)}</small>` : 'No'}</td>
+        <td></td>
       </tr>`;
-    }
-    const monthIndex = monthIndexFor(committee, m.month);
-    if (committee && monthIndex !== null) {
-      $('m_currentMonthLabel').textContent = `Filling: ${formatMonth(m.month)} (month ${monthIndex} of ${committee.totalMonths})`;
     }
     const record = committeeInstalments[0];
     const takenSelected = record && record.isTaken === 'Yes' && record.takenMonth === m.month;
     return `
-    <tr class="month-open">
+    <tr class="month-open" data-month="${m.month}">
       <td>${boliDate ? formatDate(boliDate) : '—'}</td>
       <td>${currency(sarkariGhata)}</td>
-      <td><input id="m_ghata" type="number" min="0" value="${m.ghata || ''}"></td>
-      <td id="m_kistCell">${currency(kistFor(committee, m.ghata))}</td>
-      <td><select id="m_taken"><option ${!takenSelected ? 'selected' : ''}>No</option><option ${takenSelected ? 'selected' : ''}>Yes</option></select></td>
+      <td><input class="ghata-input" type="number" min="0" value="${m.ghata || ''}"></td>
+      <td class="kist-cell">${currency(kistFor(committee, m.ghata))}</td>
+      <td><select class="taken-select"><option ${!takenSelected ? 'selected' : ''}>No</option><option ${takenSelected ? 'selected' : ''}>Yes</option></select></td>
+      <td><button class="text-button save-row-btn" type="button">Save</button></td>
     </tr>`;
   }).join('');
-  updateMonthPreview();
 }
 
 function renderCommitteeInfo() {
@@ -349,39 +351,25 @@ function renderCommitteeInfo() {
     : 'Pick a committee to see its details.';
 }
 
-// Live-updates the KIST cell and the Sarkari-floor hint as GHATA is typed into
-// the open row. Never touches the GHATA/Taken inputs' own values — those are
-// only ever set once, when the row is rendered.
-function updateMonthPreview() {
-  const month = openMonth();
-  if (!month || !$('m_ghata')) { $('m_sarkariHint').textContent = ''; return; }
-  const committee = committeeByNo(selectedCommitteeNo);
-  const ghata = Number($('m_ghata').value) || 0;
-  const kist = kistFor(committee, ghata);
-  const minGhata = sarkariGhataFor(committee, month);
-  $('m_kistCell').textContent = currency(kist);
-  $('m_sarkariHint').textContent = minGhata !== ''
-    ? `Sarkari minimum GHATA for this month: ${currency(minGhata)} — actual GHATA can't be entered lower than this.`
-    : '';
-}
-
-async function saveCommitteeMonth() {
+async function saveCommitteeMonthRow(row) {
   const no = selectedCommitteeNo;
-  const month = openMonth();
-  if (!no || !month || !$('m_ghata')) { showToast('No open month to fill for this committee'); return; }
+  const month = row.dataset.month;
+  if (!no || !month) return;
   const committee = committeeByNo(no);
-  const ghata = Number($('m_ghata').value) || 0;
+  const ghata = Number(row.querySelector('.ghata-input').value) || 0;
   const minGhata = sarkariGhataFor(committee, month);
   if (minGhata !== '' && ghata < minGhata) {
-    showToast(`GHATA can't be less than the Sarkari minimum of ${currency(minGhata)}`);
+    showToast(`${formatMonth(month)}: GHATA can't be less than the Sarkari minimum of ${currency(minGhata)}`);
     return;
   }
-  const taken = $('m_taken').value;
+  const taken = row.querySelector('.taken-select').value;
   // This one does more sheet work server-side (updating the committee's whole
   // month timeline) than other calls, so it gets a longer timeout margin.
   const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken }, 25000);
   if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
-  showToast(taken === 'Yes' ? `Marked as taken this month — KIST ${currency(response.kist)}/member` : `KIST set to ${currency(response.kist)} for every member`);
+  showToast(taken === 'Yes'
+    ? `${formatMonth(month)}: marked as taken — KIST ${currency(response.kist)}/member`
+    : `${formatMonth(month)} saved — KIST ${currency(response.kist)}/member`);
   await Promise.all([loadCommitteeMonths(), loadCommitteeInstalments()]);
 }
 
@@ -618,8 +606,19 @@ $('instCommitteeSelect').addEventListener('change', (event) => {
 });
 // The GHATA input is re-created on every render (it lives inside the History
 // table's open row), so this has to be delegated from a stable ancestor.
-$('monthHistory').addEventListener('input', (event) => { if (event.target.id === 'm_ghata') updateMonthPreview(); });
-$('saveMonthButton').addEventListener('click', saveCommitteeMonth);
+// Rows are re-created on every render, so GHATA input and Save clicks are
+// delegated from the table body instead of bound to specific elements.
+$('monthHistory').addEventListener('input', (event) => {
+  if (!event.target.classList.contains('ghata-input')) return;
+  const committee = committeeByNo(selectedCommitteeNo);
+  const kist = kistFor(committee, Number(event.target.value) || 0);
+  event.target.closest('tr').querySelector('.kist-cell').textContent = currency(kist);
+});
+$('monthHistory').addEventListener('click', (event) => {
+  const button = event.target.closest('.save-row-btn');
+  if (!button) return;
+  saveCommitteeMonthRow(button.closest('tr'));
+});
 $('addPersonButton').addEventListener('click', addPerson);
 $('newPersonName').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addPerson(); } });
 $('managePeopleList').addEventListener('click', (event) => {
