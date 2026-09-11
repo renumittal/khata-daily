@@ -218,6 +218,7 @@ function switchCommitteeSub(sub, preselectNo) {
   committeeSub = sub;
   ['list', 'add', 'instalments'].forEach((name) => { $(`committeeSub-${name}`).hidden = name !== sub; });
   document.querySelectorAll('.type-switch [data-csub]').forEach((button) => button.classList.toggle('active', button.dataset.csub === sub));
+  if (sub === 'add') $('c_no').innerHTML = '<option value="">Pick a person</option>' + people.map((name) => `<option>${escapeHtml(name)}</option>`).join('');
   if (sub === 'instalments') populateCommitteeSelect(preselectNo || selectedCommitteeNo);
 }
 
@@ -336,11 +337,13 @@ function renderCommitteeInstalments() {
   const committee = committeeByNo(selectedCommitteeNo);
   $('instList').innerHTML = committeeInstalments.map((r, i) => {
     const sarkari = sarkariFor(committee, r);
+    const personOptions = (people.includes(r.person) || !r.person ? people : [r.person, ...people])
+      .map((name) => `<option ${name === r.person ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
     return `
     <div class="verify-card" data-index="${i}">
       <div class="verify-fields">
         <div class="verify-row">
-          <input class="inst-person" type="text" placeholder="Person" value="${escapeHtml(r.person || '')}">
+          <select class="inst-person"><option value="">Pick a person</option>${personOptions}</select>
           <select class="inst-isTaken">
             <option ${r.isTaken === 'No' ? 'selected' : ''}>No</option>
             <option ${r.isTaken === 'Yes' ? 'selected' : ''}>Yes</option>
@@ -580,7 +583,7 @@ $('c_totalLakhs').addEventListener('input', updateCommitteePreview);
 $('committeeForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const no = $('c_no').value.trim();
-  if (!no) { showToast('Committee No is required'); return; }
+  if (!no) { showToast('Pick a committee person'); return; }
   const { totalMembers, totalAmount, monthlyAmount } = committeeTotalsFromForm();
   const response = await committeeRequest({
     action: 'addCommittee', no,
