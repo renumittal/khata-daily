@@ -135,15 +135,20 @@
       <div class="committee-sub" id="committeeSub-instalments" hidden>
         <label>Committee<select id="instCommitteeSelect"></select></label>
 
-        <div class="section-heading compact">
-          <div><p class="eyebrow">THIS MONTH</p><h2 style="font-size:15px;margin:0;">Boli / GHATA</h2></div>
-        </div>
         <p class="committee-info" id="m_committeeInfo">Loading committee details…</p>
+        <div class="fact-grid" id="m_committeeFacts">
+          <div class="stat-box"><small>Members</small><strong id="cf_members">—</strong></div>
+          <div class="stat-box"><small>Monthly amount</small><strong id="cf_monthly">—</strong></div>
+          <div class="stat-box"><small>Total pot</small><strong id="cf_total">—</strong></div>
+          <div class="stat-box"><small>Cut % / month</small><strong id="cf_cut">—</strong></div>
+          <div class="stat-box"><small>Start date</small><strong id="cf_start">—</strong></div>
+          <div class="stat-box"><small>End date</small><strong id="cf_end">—</strong></div>
+        </div>
         <p class="dialog-copy" id="m_currentMonthLabel"></p>
         <div class="table-scroll">
           <table>
             <thead>
-              <tr><th>Boli date</th><th>Sarkari GHATA</th><th>Actual GHATA</th><th>KIST/member</th><th>Taken</th></tr>
+              <tr><th>Boli date</th><th>Sarkari GHATA</th><th>Actual GHATA</th><th>KIST/member</th><th>Pot amount</th><th>Taken</th></tr>
             </thead>
             <tbody id="monthHistory"></tbody>
           </table>

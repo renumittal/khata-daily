@@ -319,14 +319,21 @@ function renderMonthHistory() {
   $('monthHistory').innerHTML = sorted.map((m) => {
     const sarkariGhata = sarkariGhataFor(committee, m.month);
     const boliDate = m.boliDate || boliDateFor(committee, m.month);
+    const filled = m.ghata || m.boliDate;
+    // The pot amount (total collected = whole pot minus GHATA) is shown for
+    // every filled month regardless of who took it — "Taken: No" just means
+    // someone other than this committee's own person took it that month, not
+    // that no one did, so the amount is still worth seeing either way.
+    const potAmount = filled ? committee.totalAmount - m.ghata : null;
     if (!editable.includes(m.month)) {
       return `
       <tr class="${m.takenBy ? 'month-taken' : ''}">
         <td>${boliDate ? formatDate(boliDate) : '—'}</td>
         <td>${currency(sarkariGhata)}</td>
-        <td>${m.ghata || m.boliDate ? currency(m.ghata) : '—'}</td>
-        <td>${m.ghata || m.boliDate ? currency(m.kist) : '—'}</td>
-        <td>${m.takenBy ? `Yes<br><small>${currency(m.amountReceived)}</small>` : 'No'}</td>
+        <td>${filled ? currency(m.ghata) : '—'}</td>
+        <td>${filled ? currency(m.kist) : '—'}</td>
+        <td>${potAmount !== null ? currency(potAmount) : '—'}</td>
+        <td>${m.takenBy ? 'Yes' : 'No'}</td>
       </tr>`;
     }
     const record = committeeInstalments[0];
@@ -337,6 +344,7 @@ function renderMonthHistory() {
       <td>${currency(sarkariGhata)}</td>
       <td><input class="ghata-input" type="number" min="0" value="${m.ghata || ''}"></td>
       <td class="kist-cell">${currency(kistFor(committee, m.ghata))}</td>
+      <td class="pot-cell">${currency(committee.totalAmount - (Number(m.ghata) || 0))}</td>
       <td><select class="taken-select"><option ${!takenSelected ? 'selected' : ''}>No</option><option ${takenSelected ? 'selected' : ''}>Yes</option></select></td>
     </tr>`;
   }).join('');
@@ -345,9 +353,15 @@ function renderMonthHistory() {
 
 function renderCommitteeInfo() {
   const committee = committeeByNo(selectedCommitteeNo);
-  $('m_committeeInfo').textContent = committee
-    ? `Committee #${committee.no}: ${committee.totalMembers} members, ${currency(committee.monthlyAmount)}/month, total pot ${currency(committee.totalAmount)}, cut ${committee.cutPercent}%/month${committee.startMonth ? `, runs ${formatDate(committee.startMonth)} → ${formatDate(committeeEndDate(committee))}` : ''}.`
-    : 'Pick a committee to see its details.';
+  $('m_committeeInfo').textContent = committee ? `Committee #${committee.no}` : 'Pick a committee to see its details.';
+  $('m_committeeFacts').hidden = !committee;
+  if (!committee) return;
+  $('cf_members').textContent = committee.totalMembers;
+  $('cf_monthly').textContent = currency(committee.monthlyAmount);
+  $('cf_total').textContent = currency(committee.totalAmount);
+  $('cf_cut').textContent = `${committee.cutPercent}%`;
+  $('cf_start').textContent = committee.startMonth ? formatDate(committee.startMonth) : '—';
+  $('cf_end').textContent = committee.startMonth ? formatDate(committeeEndDate(committee)) : '—';
 }
 
 // One shared button saves every filled-in open row together, and the table
@@ -623,8 +637,10 @@ $('instCommitteeSelect').addEventListener('change', (event) => {
 $('monthHistory').addEventListener('input', (event) => {
   if (!event.target.classList.contains('ghata-input')) return;
   const committee = committeeByNo(selectedCommitteeNo);
-  const kist = kistFor(committee, Number(event.target.value) || 0);
-  event.target.closest('tr').querySelector('.kist-cell').textContent = currency(kist);
+  const ghata = Number(event.target.value) || 0;
+  const row = event.target.closest('tr');
+  row.querySelector('.kist-cell').textContent = currency(kistFor(committee, ghata));
+  row.querySelector('.pot-cell').textContent = currency(committee.totalAmount - ghata);
 });
 $('saveMonthsButton').addEventListener('click', saveCommitteeMonths);
 $('addPersonButton').addEventListener('click', addPerson);
