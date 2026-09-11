@@ -333,12 +333,16 @@ function updateMonthPreview() {
   const ghata = Number($('m_ghata').value) || 0;
   const kist = kistFor(committee, ghata);
   const minGhata = sarkariGhataFor(committee, boliMonth());
+  const monthIndex = monthIndexFor(committee, boliMonth());
   $('m_kistPreview').textContent = currency(kist);
   $('m_kistTotal').textContent = currency(kist * (committee ? committee.totalMembers : 0));
   $('m_formula').textContent = committee
     ? `${currency(committee.monthlyAmount)} − (${currency(ghata)} ÷ ${committee.totalMembers} members) = ${currency(kist)} per member`
     : 'KIST = Monthly amount − (GHATA ÷ members)';
-  $('m_sarkariHint').textContent = minGhata !== '' ? `Sarkari minimum GHATA for this month: ${currency(minGhata)} — actual GHATA can't be entered lower than this.` : '';
+  const monthCountText = monthIndex !== null && committee ? `Month ${monthIndex} of ${committee.totalMonths}. ` : '';
+  $('m_sarkariHint').textContent = minGhata !== ''
+    ? `${monthCountText}Sarkari minimum GHATA for this month: ${currency(minGhata)} — actual GHATA can't be entered lower than this.`
+    : '';
   const boliDate = boliDateFor(committee, boliMonth());
   $('m_boliDatePreview').textContent = boliDate ? `Boli date: ${formatDate(boliDate)}` : '';
 }
