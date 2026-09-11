@@ -22,21 +22,36 @@ function formatMonth(yyyyMm) {
   if (!y || !m) return yyyyMm;
   return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 }
-// Only accepts the <input type=month> format (YYYY-MM); older free-text values
-// (e.g. "Jun-26" from before Start month became a date picker) return null rather
-// than NaN, so the UI can show "—" instead of a broken number.
+// Only accepts YYYY-MM (or the first 7 chars of a YYYY-MM-DD date); older
+// free-text values (e.g. "Jun-26" from before Start date became a date picker)
+// return null rather than NaN, so the UI can show "—" instead of a broken number.
 function isYYYYMM(value) { return /^\d{4}-\d{2}$/.test(value || ''); }
 function monthsBetween(fromYYYYMM, toYYYYMM) {
   const [fy, fm] = fromYYYYMM.split('-').map(Number);
   const [ty, tm] = toYYYYMM.split('-').map(Number);
   return (ty - fy) * 12 + (tm - fm);
 }
+// A committee's Start date (input type=date) is a full YYYY-MM-DD — only its
+// year+month decide which row of the timeline a given month falls on.
+function committeeStartYearMonth(committee) { return (committee && committee.startMonth || '').slice(0, 7); }
 // 1-based position of targetYYYYMM within the committee's timeline (start month = 1).
 function monthIndexFor(committee, targetYYYYMM) {
-  if (!committee || !isYYYYMM(committee.startMonth) || !isYYYYMM(targetYYYYMM)) return null;
-  return monthsBetween(committee.startMonth, targetYYYYMM) + 1;
+  const start = committeeStartYearMonth(committee);
+  if (!isYYYYMM(start) || !isYYYYMM(targetYYYYMM)) return null;
+  return monthsBetween(start, targetYYYYMM) + 1;
+}
+// Adds `months` calendar months to a YYYY-MM-DD date string, keeping the same day of month.
+function addMonthsToDate(dateStr, months) {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setMonth(d.getMonth() + months);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function committeeByNo(no) { return committees.find((c) => c.no === no); }
+function committeeEndDate(committee) {
+  if (!committee || !committee.startMonth || !committee.totalMonths) return '';
+  return addMonthsToDate(committee.startMonth, committee.totalMonths - 1);
+}
 function pendingMonthsFor(committee) {
   if (!committee || !committee.totalMonths) return '';
   const idx = monthIndexFor(committee, currentYYYYMM());
@@ -239,7 +254,7 @@ function renderCommittees() {
       <div class="person-avatar">${escapeHtml(c.no)}</div>
       <div class="person-summary-main">
         <div class="person-summary-name">Committee #${escapeHtml(c.no)}</div>
-        <div class="person-summary-meta">${c.totalMembers} members · ${c.totalMonths} months · ${currency(c.monthlyAmount)}/month${c.startMonth ? ` · from ${escapeHtml(formatMonth(c.startMonth))}` : ''}</div>
+        <div class="person-summary-meta">${c.totalMembers} members · ${c.totalMonths} months · ${currency(c.monthlyAmount)}/month${c.startMonth ? ` · ${escapeHtml(formatDate(c.startMonth))} → ${escapeHtml(formatDate(committeeEndDate(c)))}` : ''}</div>
       </div>
       <div class="person-summary-balance ${c.status === 'Closed' ? 'owing' : 'owed'}"><small>${escapeHtml(c.status || 'Running')}</small></div>
     </div>`).join('');
@@ -277,29 +292,23 @@ async function loadCommitteeMonths() {
 }
 
 function renderMonthHistory() {
-  const committee = committeeByNo(selectedCommitteeNo);
-  const sorted = [...committeeMonths].sort((a, b) => b.month.localeCompare(a.month));
+  const sorted = [...committeeMonths].sort((a, b) => a.month.localeCompare(b.month));
   $('monthHistoryEmpty').hidden = sorted.length > 0;
-  $('monthHistory').innerHTML = sorted.map((m) => {
-    const takenRow = committeeInstalments.find((r) => r.takenMonth === m.month);
-    const received = committee ? m.kist * committee.totalMembers : m.kist;
-    const takenBy = takenRow ? `${escapeHtml(takenRow.person)}<br><small>${currency(received)}</small>` : '—';
-    return `
-    <tr>
+  $('monthHistory').innerHTML = sorted.map((m) => `
+    <tr class="${m.takenBy ? 'month-taken' : ''}">
       <td>${escapeHtml(formatMonth(m.month))}</td>
       <td>${m.boliDate ? formatDate(m.boliDate) : '—'}</td>
-      <td>${currency(sarkariGhataFor(committee, m.month))}</td>
+      <td>${currency(m.sarkariGhata)}</td>
       <td>${currency(m.ghata)}</td>
       <td>${currency(m.kist)}</td>
-      <td>${takenBy}</td>
-    </tr>`;
-  }).join('');
+      <td>${m.takenBy ? `${escapeHtml(m.takenBy)}<br><small>${currency(m.amountReceived)}</small>` : '—'}</td>
+    </tr>`).join('');
 }
 
 function renderCommitteeInfo() {
   const committee = committeeByNo(selectedCommitteeNo);
   $('m_committeeInfo').textContent = committee
-    ? `Committee #${committee.no}: ${committee.totalMembers} members, ${currency(committee.monthlyAmount)}/month, total pot ${currency(committee.totalAmount)}.`
+    ? `Committee #${committee.no}: ${committee.totalMembers} members, ${currency(committee.monthlyAmount)}/month, total pot ${currency(committee.totalAmount)}${committee.startMonth ? `, runs ${formatDate(committee.startMonth)} → ${formatDate(committeeEndDate(committee))}` : ''}.`
     : 'Pick a committee to see its details.';
 }
 
@@ -573,12 +582,16 @@ function committeeTotalsFromForm() {
 }
 function updateCommitteePreview() {
   const { totalMembers, totalAmount, monthlyAmount } = committeeTotalsFromForm();
-  $('c_preview').textContent = totalMembers && totalAmount
-    ? `${totalMembers} months · ${currency(monthlyAmount)}/month · Total ${currency(totalAmount)}`
-    : 'Months and the monthly instalment are worked out automatically from the total amount and member count.';
+  const start = $('c_start').value;
+  const end = start && totalMembers ? addMonthsToDate(start, totalMembers - 1) : '';
+  const parts = [];
+  if (totalMembers && totalAmount) parts.push(`${totalMembers} months · ${currency(monthlyAmount)}/month · Total ${currency(totalAmount)}`);
+  if (end) parts.push(`Runs ${formatDate(start)} → ${formatDate(end)}`);
+  $('c_preview').textContent = parts.length ? parts.join(' · ') : 'Months and the monthly instalment are worked out automatically from the total amount, member count, and start date.';
 }
 $('c_members').addEventListener('input', updateCommitteePreview);
 $('c_totalLakhs').addEventListener('input', updateCommitteePreview);
+$('c_start').addEventListener('input', updateCommitteePreview);
 
 $('committeeForm').addEventListener('submit', async (event) => {
   event.preventDefault();

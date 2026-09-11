@@ -941,6 +941,11 @@ dialog::backdrop {
     border-bottom: none;
 }
 
+.table-scroll tr.month-taken td {
+    background: var(--green-soft);
+    font-weight: 700;
+}
+
 @media (max-width: 430px) {
     .app-shell {
         width:min(100% - 22px,620px);
