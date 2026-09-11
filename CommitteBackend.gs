@@ -41,6 +41,10 @@ function asText_(value) {
   const trimmed = String(value || '').trim();
   return trimmed ? "'" + trimmed : '';
 }
+function toDateString_(value) {
+  if (value instanceof Date) return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  return String(value || '');
+}
 
 function getCommitteesSheet_() {
   const spreadsheet = getSpreadsheet();
@@ -124,7 +128,7 @@ function getCommitteeMonthsSheet_() {
   let sheet = spreadsheet.getSheetByName(COMMITTEE_MONTHS_SHEET_NAME);
   if (!sheet) sheet = spreadsheet.insertSheet(COMMITTEE_MONTHS_SHEET_NAME);
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['No', 'Month', 'GHATA', 'KIST']);
+    sheet.appendRow(['No', 'Month', 'GHATA', 'KIST', 'BoliDate']);
   }
   return sheet;
 }
@@ -133,9 +137,9 @@ function readCommitteeMonths_(committeeNo) {
   const sheet = getCommitteeMonthsSheet_();
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
-  const values = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  const values = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
   return values
-    .map((row, index) => ({ row: index + 2, no: String(row[0] || ''), month: toYearMonthString_(row[1]), ghata: Number(row[2]) || 0, kist: Number(row[3]) || 0 }))
+    .map((row, index) => ({ row: index + 2, no: String(row[0] || ''), month: toYearMonthString_(row[1]), ghata: Number(row[2]) || 0, kist: Number(row[3]) || 0, boliDate: toDateString_(row[4]) }))
     .filter((entry) => entry.month && (!committeeNo || entry.no === String(committeeNo)));
 }
 
@@ -150,13 +154,14 @@ function saveCommitteeMonth_(params) {
 
   const ghata = Number(params.ghata) || 0;
   const kist = committee.totalMembers ? Math.round(committee.monthlyAmount - (ghata / committee.totalMembers)) : committee.monthlyAmount;
+  const boliDate = asText_(params.boliDate);
 
   const monthsSheet = getCommitteeMonthsSheet_();
   const existing = readCommitteeMonths_(no).find((entry) => entry.month === month);
   if (existing) {
-    monthsSheet.getRange(existing.row, 1, 1, 4).setValues([[no, asText_(month), ghata, kist]]);
+    monthsSheet.getRange(existing.row, 1, 1, 5).setValues([[no, asText_(month), ghata, kist, boliDate]]);
   } else {
-    monthsSheet.appendRow([no, asText_(month), ghata, kist]);
+    monthsSheet.appendRow([no, asText_(month), ghata, kist, boliDate]);
   }
 
   const instSheet = getCommitteeInstalmentsSheet_();

@@ -251,6 +251,7 @@ function populateCommitteeSelect(preselectNo) {
   selectedCommitteeNo = sel.value || null;
   $('m_month').value = currentYYYYMM();
   $('m_ghata').value = '';
+  $('m_boliDate').value = '';
   renderCommitteeInfo();
   loadCommitteeInstalments();
   loadCommitteeMonths();
@@ -269,6 +270,7 @@ async function loadCommitteeMonths() {
   committeeMonths = (response && response.months) || [];
   const existing = committeeMonths.find((m) => m.month === $('m_month').value);
   $('m_ghata').value = existing ? existing.ghata : '';
+  $('m_boliDate').value = existing ? existing.boliDate : '';
   updateMonthPreview();
   renderMonthHistory();
 }
@@ -284,6 +286,7 @@ function renderMonthHistory() {
     return `
     <tr>
       <td>${escapeHtml(formatMonth(m.month))}</td>
+      <td>${m.boliDate ? formatDate(m.boliDate) : '—'}</td>
       <td>${currency(sarkariGhataFor(committee, m.month))}</td>
       <td>${currency(m.ghata)}</td>
       <td>${currency(m.kist)}</td>
@@ -323,7 +326,7 @@ async function saveCommitteeMonth() {
     showToast(`GHATA can't be less than the Sarkari minimum of ${currency(minGhata)}`);
     return;
   }
-  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata });
+  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: $('m_boliDate').value });
   if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
   showToast(`KIST set to ${currency(response.kist)} for every member`);
   await Promise.all([loadCommitteeMonths(), loadCommitteeInstalments()]);
@@ -597,6 +600,7 @@ $('instCommitteeSelect').addEventListener('change', (event) => {
   selectedCommitteeNo = event.target.value || null;
   $('m_month').value = currentYYYYMM();
   $('m_ghata').value = '';
+  $('m_boliDate').value = '';
   renderCommitteeInfo();
   loadCommitteeInstalments();
   loadCommitteeMonths();
@@ -604,10 +608,6 @@ $('instCommitteeSelect').addEventListener('change', (event) => {
 $('m_month').addEventListener('change', loadCommitteeMonths);
 $('m_ghata').addEventListener('input', updateMonthPreview);
 $('saveMonthButton').addEventListener('click', saveCommitteeMonth);
-$('addInstalmentRowButton').addEventListener('click', () => {
-  committeeInstalments.push({ person: '', isTaken: 'No', amount: '', takenMonth: '', kist: '', ghata: '', sarkari: '', status: '', pendingMonth: '' });
-  renderCommitteeInstalments();
-});
 $('instList').addEventListener('click', (event) => {
   const button = event.target.closest('.inst-save');
   if (!button) return;
