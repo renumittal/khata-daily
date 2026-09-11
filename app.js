@@ -610,7 +610,12 @@ $('committeeForm').addEventListener('submit', async (event) => {
   // The start date is folded into the identifier so the same person can run more
   // than one committee (e.g. two different rounds) without them colliding —
   // this also makes them easy to tell apart in the committee list and dropdown.
-  const no = `${person} (${formatDate(start)})`;
+  // If that's somehow still not unique (e.g. two committees for the same person
+  // starting the same day), keep appending a counter rather than silently
+  // colliding two committees into the same rows/sheet.
+  let no = `${person} (${formatDate(start)})`;
+  let suffix = 2;
+  while (committees.some((c) => c.no === no)) { no = `${person} (${formatDate(start)}) #${suffix++}`; }
   const { totalMembers, totalAmount, monthlyAmount } = committeeTotalsFromForm();
   const response = await committeeRequest({
     action: 'addCommittee', no,
