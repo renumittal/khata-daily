@@ -241,6 +241,14 @@ function doGet(e) {
     }
   }
 
+  if (params.action === 'personNet') {
+    try {
+      return respond(e, { ok: true, ...readPersonNet_(params.person) });
+    } catch (error) {
+      return respond(e, { ok: false, error: String(error) });
+    }
+  }
+
   if (params.action === 'refreshCalendarMonths') {
     try {
       const months = String(params.months || '').split(',').map((m) => m.trim()).filter(Boolean);

@@ -243,7 +243,10 @@ async function loadMonthView(month) {
   monthViewMonth = month;
   if (!committees.length) await loadCommittees();
   if (!isYYYYMM(month)) { monthViewRows = []; renderMonthView(); return; }
-  const response = await committeeRequest({ action: 'calendarMonth', month });
+  // Rebuilds the whole calendar-month sheet server-side (reads every committee's
+  // own month sheet + instalment row), so it's slower than the simpler calls —
+  // needs the same longer timeout margin as saveCommitteeMonth.
+  const response = await committeeRequest({ action: 'calendarMonth', month }, 25000);
   monthViewRows = (response && response.rows) || [];
   renderMonthView();
 }
@@ -369,6 +372,18 @@ function renderAnalysisMonth() {
   }).join('');
 }
 
+// A committee's current net position, as of today (not a saved month) — same
+// sign convention as the backend's calendar-month rollup and "Net - <person>"
+// sheet: already taken = negative (owed back to the owner), not yet taken =
+// positive (still invested with the pot).
+function currentNetInvst(committee, instalment) {
+  const idx = monthIndexFor(committee, currentYYYYMM());
+  const clampedIdx = idx === null ? 0 : Math.max(0, Math.min(committee.totalMonths, idx));
+  const taken = Boolean(instalment && instalment.isTaken === 'Yes');
+  const pendingMonth = taken ? (Number(instalment.pendingMonth) || 0) : (committee.totalMonths - clampedIdx);
+  return taken ? -(pendingMonth * committee.monthlyAmount) : committee.monthlyAmount * clampedIdx;
+}
+
 // All committees grouped by the person who runs them — so someone running
 // several committees (e.g. Vijay with 5) sees every one of them under a
 // single group instead of hunting through the flat committee list.
@@ -392,6 +407,9 @@ function renderAnalysisPerson() {
     const list = committees.slice().sort((a, b) => (a.startMonth || '').localeCompare(b.startMonth || ''));
     const totalPot = list.reduce((sum, c) => sum + (c.totalAmount || 0), 0);
     const takenCount = list.filter((c) => { const inst = instalmentsByNo.get(c.no); return inst && inst.isTaken === 'Yes'; }).length;
+    const netWithPerson = list.reduce((sum, c) => sum + currentNetInvst(c, instalmentsByNo.get(c.no)), 0);
+    const netState = netWithPerson > 0 ? 'owed' : netWithPerson < 0 ? 'owing' : 'settled';
+    const netLabel = netState === 'owed' ? `${escapeHtml(person)} owes you` : netState === 'owing' ? `You owe ${escapeHtml(person)}` : 'Settled';
     return `
     <div class="analysis-person-group">
       <div class="person-summary-row">
@@ -399,6 +417,10 @@ function renderAnalysisPerson() {
         <div class="person-summary-main">
           <div class="person-summary-name">${escapeHtml(person)}</div>
           <div class="person-summary-meta">${list.length} committee${list.length > 1 ? 's' : ''} · ${currency(totalPot)} total · ${takenCount} taken</div>
+        </div>
+        <div class="person-summary-balance ${netState}">
+          <strong>${currency(Math.abs(netWithPerson))}</strong>
+          <small>${netLabel}</small>
         </div>
       </div>
       <div class="table-scroll">

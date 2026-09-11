@@ -122,6 +122,7 @@ function addCommittee_(params) {
     committee.totalAmount, committee.cutPercent, committee.extraProfit, asText_(committee.startMonth), committee.status,
   ]);
   ensureCommitteeMonthRows_(committee);
+  refreshPersonNetSheet_(personOf_(committee.no));
 }
 
 function readCommitteeInstalments_(committeeNo) {
@@ -152,6 +153,7 @@ function saveCommitteeInstalment_(params) {
   }
   const committee = readCommittees_().find((c) => c.no === no);
   if (committee) applyTakenHighlight_(committee);
+  refreshPersonNetSheet_(person);
 }
 
 // ---------- Per-committee "Kameti - <person>" sheet ----------
@@ -435,4 +437,74 @@ function readCalendarMonth_(yyyymm) {
     takenMonth: String(row[10] || ''), pendingMonth: row[11], status: String(row[12] || ''),
     boliDate: toDateString_(row[13]), filled: String(row[14] || '') === 'Yes',
   }));
+}
+
+// ---------- Per-person net position ("Net - <person>") ----------
+//
+// A person's CURRENT net across every committee THEY run (not just one
+// month) — same Total Invst sign convention as the calendar-month rollup,
+// but anchored to today rather than a saved calendar month. Rebuilt
+// whenever a committee is added or an instalment/month is saved for them.
+function currentYearMonth_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM');
+}
+
+function personNetSheetName_(person) {
+  const clean = String(person || '').replace(/[:\\\/\?\*\[\]]/g, ' ').trim().slice(0, 80);
+  return `Net - ${clean || 'Unnamed'}`;
+}
+
+function getPersonNetSheet_(person) {
+  const spreadsheet = getSpreadsheet();
+  const name = personNetSheetName_(person);
+  let sheet = spreadsheet.getSheetByName(name);
+  if (!sheet) sheet = spreadsheet.insertSheet(name);
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['Committee No', 'Total Month', 'Monthly Amount', 'Is Taken', 'Pending Month', 'Net Invst']);
+  }
+  return sheet;
+}
+
+function refreshPersonNetSheet_(person) {
+  if (!person) return;
+  const sheet = getPersonNetSheet_(person);
+  const today = currentYearMonth_();
+  const rows = [];
+  let total = 0;
+
+  readCommittees_()
+    .filter((c) => personOf_(c.no).toLowerCase() === person.toLowerCase())
+    .forEach((committee) => {
+      const idx = monthIndexFor_(committee, today);
+      const clampedIdx = idx === null ? 0 : Math.max(0, Math.min(committee.totalMonths, idx));
+      const instalment = readCommitteeInstalments_(committee.no)[0];
+      const taken = Boolean(instalment && instalment.isTaken === 'Yes');
+      const pendingMonth = taken ? (Number(instalment.pendingMonth) || 0) : (committee.totalMonths - clampedIdx);
+      const netInvst = taken ? -(pendingMonth * committee.monthlyAmount) : committee.monthlyAmount * clampedIdx;
+      total += netInvst;
+      rows.push([committee.no, committee.totalMonths, committee.monthlyAmount, taken ? 'Yes' : 'No', pendingMonth, netInvst]);
+    });
+
+  const lastRow = sheet.getLastRow();
+  const clearRows = Math.max(0, lastRow - 1);
+  if (clearRows) sheet.getRange(2, 1, clearRows, 6).clearContent();
+  if (rows.length) sheet.getRange(2, 1, rows.length, 6).setValues(rows);
+  sheet.getRange(rows.length + 3, 1).setValue(`Net with ${person}`);
+  sheet.getRange(rows.length + 3, 6).setValue(total);
+}
+
+function readPersonNet_(person) {
+  refreshPersonNetSheet_(person);
+  const sheet = getPersonNetSheet_(person);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { rows: [], total: 0 };
+  const values = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  const rows = values
+    .filter((row) => String(row[0] || '').trim())
+    .map((row) => ({
+      no: String(row[0]), totalMonth: row[1], monthlyAmount: row[2],
+      isTaken: String(row[3] || ''), pendingMonth: row[4], netInvst: row[5],
+    }));
+  const total = rows.reduce((sum, r) => sum + (Number(r.netInvst) || 0), 0);
+  return { rows, total };
 }
