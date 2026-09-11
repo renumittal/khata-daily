@@ -278,11 +278,14 @@ function saveCommitteeMonth_(params) {
 
   const sheet = getCommitteeSheetByNo_(no);
   const existing = readCommitteeMonths_(no).find((entry) => entry.month === month);
+  // Sarkari GHATA is recomputed fresh every save (not just left at whatever it
+  // was pre-filled with when the row was first created) so it always reflects
+  // the committee's current cut%/start date, even if those were fixed later.
+  const sarkariGhata = sarkariGhataFor_(committee, month);
   if (existing) {
-    sheet.getRange(existing.row, 2, 1, 1).setValues([[boliDate]]);
-    sheet.getRange(existing.row, 4, 1, 2).setValues([[ghata, kist]]);
+    sheet.getRange(existing.row, 2, 1, 4).setValues([[boliDate, sarkariGhata, ghata, kist]]);
   } else {
-    sheet.appendRow([asText_(month), boliDate, sarkariGhataFor_(committee, month), ghata, kist, '', '']);
+    sheet.appendRow([asText_(month), boliDate, sarkariGhata, ghata, kist, '', '']);
   }
 
   const instSheet = getCommitteeInstalmentsSheet_();
