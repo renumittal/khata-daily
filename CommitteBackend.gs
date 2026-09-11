@@ -144,6 +144,12 @@ function saveCommitteeInstalment_(params) {
 
 // ---------- Per-committee "Kameti - <person>" sheet ----------
 
+// A committee's "no" is "Person (start date)" — strip the date back off when
+// only the person's name is wanted (e.g. as the row in Committee Instalments).
+function personOf_(no) {
+  return String(no || '').replace(/\s*\(.*\)$/, '');
+}
+
 function committeeSheetName_(no) {
   const clean = String(no || '').replace(/[:\\\/\?\*\[\]]/g, ' ').trim().slice(0, 80);
   return `Kameti - ${clean || 'Unnamed'}`;
@@ -274,6 +280,24 @@ function saveCommitteeMonth_(params) {
   readCommitteeInstalments_(no).forEach((member) => {
     instSheet.getRange(member.row, 6, 1, 2).setValues([[kist, ghata]]); // KIST (col 6), GHATA (col 7)
   });
+
+  // Sync the committee's own person's taken status. Marking "Yes" this month
+  // always wins; marking "No" only clears a taken record if it was for THIS
+  // same month (i.e. un-marking it) — it never silently erases a taken record
+  // for a different month just because a later month was saved with "No".
+  const person = personOf_(no);
+  const existingRecord = readCommitteeInstalments_(no).find((m) => m.person.toLowerCase() === person.toLowerCase());
+  const alreadyTakenElsewhere = existingRecord && existingRecord.isTaken === 'Yes' && existingRecord.takenMonth && existingRecord.takenMonth !== month;
+  const idx = monthIndexFor_(committee, month);
+  const pendingMonth = idx !== null ? Math.max(0, committee.totalMonths - idx) : '';
+
+  if (params.taken === 'Yes') {
+    const cut = (Number(committee.cutPercent) || 0) / 100;
+    const sarkari = idx !== null ? Math.round(committee.monthlyAmount - committee.monthlyAmount * cut * (committee.totalMonths - idx)) : 0;
+    saveCommitteeInstalment_({ no, person, isTaken: 'Yes', takenMonth: month, amount: kist * committee.totalMembers, kist, ghata, sarkari, status: 'Taken', pendingMonth });
+  } else if (!alreadyTakenElsewhere) {
+    saveCommitteeInstalment_({ no, person, isTaken: 'No', takenMonth: '', amount: 0, kist, ghata, sarkari: 0, status: '', pendingMonth });
+  }
 
   applyTakenHighlight_(committee);
 

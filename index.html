@@ -143,6 +143,9 @@
           <label>Month<input id="m_month" type="month" required></label>
           <label>GHATA (₹)<input id="m_ghata" type="number" min="0"></label>
         </div>
+        <label>Taken by me this month?
+          <select id="m_taken"><option>No</option><option>Yes</option></select>
+        </label>
         <p class="dialog-copy" id="m_boliDatePreview"></p>
         <div class="stat-row">
           <div class="stat-box"><small>Month</small><strong id="m_monthIndex">—</strong></div>
@@ -171,9 +174,8 @@
 
         <div class="stat-row" style="margin-top:20px;">
           <div class="stat-box"><small>Pending months</small><strong id="sumPending">—</strong></div>
-          <div class="stat-box"><small>Members taken</small><strong id="sumTaken">0</strong></div>
+          <div class="stat-box"><small>Taken</small><strong id="sumTaken">Not yet</strong></div>
         </div>
-        <div class="verify-list" id="instList"></div>
       </div>
     </section>
   </main>

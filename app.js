@@ -58,14 +58,6 @@ function pendingMonthsFor(committee) {
   if (idx === null) return '';
   return Math.max(0, Math.min(committee.totalMonths, committee.totalMonths - idx));
 }
-// Matches the sample sheet: MonthlyAmount − MonthlyAmount×(Cut%)×(TotalMonths − month-taken index).
-function sarkariFor(committee, row) {
-  if (!committee || !row.takenMonth) return '';
-  const idx = monthIndexFor(committee, row.takenMonth);
-  if (idx === null) return '';
-  const cut = (Number(committee.cutPercent) || 0) / 100;
-  return Math.round(committee.monthlyAmount - committee.monthlyAmount * cut * (committee.totalMonths - idx));
-}
 // The floor GHATA for a given month: TotalMembers × MonthlyAmount × Cut% × (months
 // remaining after this one). The boli/auction discount actually entered that month
 // can't be lower than this — it's the guaranteed minimum cut.
@@ -344,6 +336,8 @@ function updateMonthPreview() {
   $('m_sarkariHint').textContent = minGhata !== '' ? "Actual GHATA can't be entered lower than the Sarkari minimum above." : '';
   const boliDate = boliDateFor(committee, boliMonth());
   $('m_boliDatePreview').textContent = boliDate ? `Boli date: ${formatDate(boliDate)}` : '';
+  const record = committeeInstalments[0];
+  $('m_taken').value = record && record.isTaken === 'Yes' && record.takenMonth === boliMonth() ? 'Yes' : 'No';
 }
 
 async function saveCommitteeMonth() {
@@ -357,67 +351,23 @@ async function saveCommitteeMonth() {
     showToast(`GHATA can't be less than the Sarkari minimum of ${currency(minGhata)}`);
     return;
   }
-  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month) });
+  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata, boliDate: boliDateFor(committee, month), taken: $('m_taken').value });
   if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
-  showToast(`KIST set to ${currency(response.kist)} for every member`);
+  showToast($('m_taken').value === 'Yes' ? `Marked as taken this month — KIST ${currency(response.kist)}/member` : `KIST set to ${currency(response.kist)} for every member`);
   await Promise.all([loadCommitteeMonths(), loadCommitteeInstalments()]);
 }
 
+// The committee has exactly one instalment row — its own person's — tracking
+// whether (and which month) they took the pot. Refreshes the stat boxes and
+// pre-selects "Taken by me this month?" to match the currently picked month.
 function renderCommitteeInstalments() {
   const committee = committeeByNo(selectedCommitteeNo);
-  $('instList').innerHTML = committeeInstalments.map((r, i) => {
-    const sarkari = sarkariFor(committee, r);
-    const personOptions = (people.includes(r.person) || !r.person ? people : [r.person, ...people])
-      .map((name) => `<option ${name === r.person ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
-    return `
-    <div class="verify-card" data-index="${i}">
-      <div class="verify-fields">
-        <div class="verify-row">
-          <select class="inst-person"><option value="">Pick a person</option>${personOptions}</select>
-          <select class="inst-isTaken">
-            <option ${r.isTaken === 'No' ? 'selected' : ''}>No</option>
-            <option ${r.isTaken === 'Yes' ? 'selected' : ''}>Yes</option>
-          </select>
-        </div>
-        <div class="verify-row">
-          <input class="inst-amount" type="number" placeholder="Amount" value="${r.amount || ''}">
-          <input class="inst-takenMonth" type="month" value="${escapeHtml(r.takenMonth || '')}">
-        </div>
-        <div class="person-summary-meta">KIST ${currency(r.kist || 0)} · GHATA ${currency(r.ghata || 0)} <small>(set from "This month" above)</small></div>
-        <div class="person-summary-meta">Sarkari (auto) ${sarkari !== '' ? currency(sarkari) : '— set taken month first'}</div>
-        <input class="inst-status" type="text" placeholder="Status (e.g. Not taken)" value="${escapeHtml(r.status || '')}">
-        <button class="text-button inst-save" type="button">Save row</button>
-      </div>
-    </div>`;
-  }).join('');
+  const record = committeeInstalments[0];
   const pending = pendingMonthsFor(committee);
   $('sumPending').textContent = pending === '' ? '—' : pending;
-  $('sumTaken').textContent = committeeInstalments.filter((r) => r.isTaken === 'Yes').length;
+  $('sumTaken').textContent = record && record.isTaken === 'Yes' ? `Yes (${formatMonth(record.takenMonth)})` : 'Not yet';
+  updateMonthPreview();
   renderMonthHistory();
-}
-
-async function saveInstalmentRow(index) {
-  const card = document.querySelector(`#instList .verify-card[data-index="${index}"]`);
-  const existingRow = committeeInstalments[index];
-  const committee = committeeByNo(selectedCommitteeNo);
-  const takenMonth = card.querySelector('.inst-takenMonth').value;
-  const row = {
-    no: selectedCommitteeNo,
-    person: card.querySelector('.inst-person').value.trim(),
-    isTaken: card.querySelector('.inst-isTaken').value,
-    amount: card.querySelector('.inst-amount').value,
-    takenMonth,
-    kist: existingRow.kist,
-    ghata: existingRow.ghata,
-    sarkari: sarkariFor(committee, { takenMonth }),
-    status: card.querySelector('.inst-status').value,
-    pendingMonth: pendingMonthsFor(committee),
-  };
-  if (!row.person) { showToast('Person name is required'); return; }
-  const response = await committeeRequest({ action: 'saveCommitteeInstalment', ...row });
-  if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
-  showToast('Saved');
-  loadCommitteeInstalments();
 }
 
 function renderVerifyList() {
@@ -650,11 +600,6 @@ $('instCommitteeSelect').addEventListener('change', (event) => {
 $('m_month').addEventListener('change', loadCommitteeMonths);
 $('m_ghata').addEventListener('input', updateMonthPreview);
 $('saveMonthButton').addEventListener('click', saveCommitteeMonth);
-$('instList').addEventListener('click', (event) => {
-  const button = event.target.closest('.inst-save');
-  if (!button) return;
-  saveInstalmentRow(Number(button.closest('.verify-card').dataset.index));
-});
 $('addPersonButton').addEventListener('click', addPerson);
 $('newPersonName').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addPerson(); } });
 $('managePeopleList').addEventListener('click', (event) => {
