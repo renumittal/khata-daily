@@ -569,7 +569,11 @@ function refreshPersonNetSheet_(person) {
       const clampedIdx = idx === null ? 0 : Math.max(0, Math.min(committee.totalMonths, idx));
       const instalment = readCommitteeInstalments_(committee.no)[0];
       const taken = Boolean(instalment && instalment.isTaken === 'Yes');
-      const pendingMonth = taken ? (Number(instalment.pendingMonth) || 0) : (committee.totalMonths - clampedIdx);
+      // Pending months always counts down live from TODAY's position in the
+      // committee's timeline — it must NOT stay frozen at whatever it was
+      // when the committee was first marked taken, the same way the
+      // calendar-month rollup recomputes it fresh per target month.
+      const pendingMonth = committee.totalMonths - clampedIdx;
       const netInvst = taken ? -(pendingMonth * committee.monthlyAmount) : committee.monthlyAmount * clampedIdx;
       total += netInvst;
       rows.push([committee.no, committee.totalMonths, committee.monthlyAmount, taken ? 'Yes' : 'No', pendingMonth, netInvst]);

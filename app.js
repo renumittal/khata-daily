@@ -20,6 +20,7 @@ let analysisReport = 'month';
 let monthViewMonth = null;
 let monthViewRows = [];
 let pendingCommitteeVerification = [];
+let allCommitteeInstalments = [];
 
 function currentYYYYMM() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function formatMonth(yyyyMm) {
@@ -203,11 +204,46 @@ async function setPersonActive(name, active) {
   await Promise.all([loadAllPeople(), loadPeople()]);
 }
 
+// Loads just enough committee data (committees + every instalment row) to
+// fold each person's committee net position into their overall People-tab
+// balance — a lighter pair of calls than loadCommitteeAnalysis, which also
+// pulls every committee's whole month history (not needed here).
+async function loadCommitteeNetData() {
+  const [committeesResponse, instalmentsResponse] = await Promise.all([
+    committeeRequest({ action: 'committees' }),
+    committeeRequest({ action: 'committeeInstalments' }),
+  ]);
+  if (committeesResponse && committeesResponse.ok) committees = committeesResponse.committees || [];
+  if (instalmentsResponse && instalmentsResponse.ok) allCommitteeInstalments = instalmentsResponse.instalments || [];
+}
+
+// A person's current committee net (see currentNetInvst) summed across every
+// committee they run — same sign convention as the People/personDetail
+// balance: positive = they owe you, negative = you owe them. Matched
+// case-insensitively, same as the Analysis person-wise report, and across
+// every committee regardless of status (a "Closed" committee isn't
+// necessarily fully settled to zero).
+function committeeNetForPerson(name) {
+  const key = String(name || '').toLowerCase();
+  if (!key) return 0;
+  const instalmentsByNo = new Map(allCommitteeInstalments.map((i) => [i.no, i]));
+  return committees
+    .filter((c) => personOf(c.no).toLowerCase() === key)
+    .reduce((sum, c) => sum + currentNetInvst(c, instalmentsByNo.get(c.no)), 0);
+}
+
+// The overall balance shown for a person is the ledger balance (credit/debit
+// entries) PLUS whatever they currently owe/are owed across their
+// committees — e.g. once a lumpsum settling a committee due is recorded as a
+// ledger credit/debit, it nets against that committee amount here rather
+// than the two living as separate, disconnected numbers.
 function personSummary(name) {
   const list = allEntries().filter((entry) => entry.person === name).sort((a, b) => `${a.date}${a.createdAt}`.localeCompare(`${b.date}${b.createdAt}`));
   const credit = list.filter((entry) => entry.type === 'credit').reduce((sum, entry) => sum + entry.amount, 0);
   const debit = list.filter((entry) => entry.type === 'debit').reduce((sum, entry) => sum + entry.amount, 0);
-  return { list, count: list.length, firstDate: list[0]?.date, lastDate: list[list.length - 1]?.date, credit, debit, net: credit - debit };
+  const ledgerNet = credit - debit;
+  const committeeNet = committeeNetForPerson(name);
+  return { list, count: list.length, firstDate: list[0]?.date, lastDate: list[list.length - 1]?.date, credit, debit, ledgerNet, committeeNet, net: ledgerNet + committeeNet };
 }
 
 function switchView(view) {
@@ -217,8 +253,14 @@ function switchView(view) {
   $('personDetailView').hidden = view !== 'personDetail';
   $('committeeView').hidden = view !== 'committee';
   document.querySelectorAll('.tab-button[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view || (view === 'personDetail' && button.dataset.view === 'people')));
-  if (view === 'people') { renderPeopleDirectory(); loadTransactions().then(() => { if (!$('peopleView').hidden) renderPeopleDirectory(); }); }
-  if (view === 'personDetail') renderPersonDetail();
+  if (view === 'people') {
+    renderPeopleDirectory();
+    Promise.all([loadTransactions(), loadCommitteeNetData()]).then(() => { if (!$('peopleView').hidden) renderPeopleDirectory(); });
+  }
+  if (view === 'personDetail') {
+    renderPersonDetail();
+    loadCommitteeNetData().then(() => { if (!$('personDetailView').hidden) renderPersonDetail(); });
+  }
   if (view === 'verify') loadUnverified();
   if (view === 'committee') { loadCommittees(); switchCommitteeSub(committeeSub); loadCommitteeUnverifiedBadge(); }
 }
@@ -463,7 +505,10 @@ function currentNetInvst(committee, instalment) {
   const idx = monthIndexFor(committee, currentYYYYMM());
   const clampedIdx = idx === null ? 0 : Math.max(0, Math.min(committee.totalMonths, idx));
   const taken = Boolean(instalment && instalment.isTaken === 'Yes');
-  const pendingMonth = taken ? (Number(instalment.pendingMonth) || 0) : (committee.totalMonths - clampedIdx);
+  // Pending months counts down live from today's position, same as the
+  // calendar-month rollup — never frozen at whatever it was when the
+  // committee was first marked taken. Mirrors refreshPersonNetSheet_.
+  const pendingMonth = committee.totalMonths - clampedIdx;
   return taken ? -(pendingMonth * committee.monthlyAmount) : committee.monthlyAmount * clampedIdx;
 }
 
@@ -830,6 +875,15 @@ function renderPersonDetail() {
   $('personBalanceFill').style.width = `${total > 0 ? (summary.credit / total) * 100 : 50}%`;
   $('personCreditTotal').textContent = currency(summary.credit);
   $('personDebitTotal').textContent = currency(summary.debit);
+  // The credit/debit split above is ledger-only, so it won't add up to the
+  // combined balance once a committee due is folded in — spell that out
+  // rather than leaving the numbers looking inconsistent.
+  const committeeNote = $('personCommitteeNote');
+  committeeNote.hidden = summary.committeeNet === 0;
+  if (summary.committeeNet !== 0) {
+    const committeeState = summary.committeeNet > 0 ? `${name} owes you` : `You owe ${name}`;
+    committeeNote.textContent = `Includes ${currency(Math.abs(summary.committeeNet))} from committees (${committeeState}) — record a lumpsum payment as a normal credit/debit entry here to settle it.`;
+  }
 
   let runningBalance = 0;
   const withBalance = summary.list.map((entry) => {
