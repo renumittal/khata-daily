@@ -207,17 +207,17 @@ async function setPersonActive(name, active) {
   await Promise.all([loadAllPeople(), loadPeople()]);
 }
 
-// Loads just enough committee data (committees + every instalment row) to
-// fold each person's committee net position into their overall People-tab
-// balance — a lighter pair of calls than loadCommitteeAnalysis, which also
-// pulls every committee's whole month history (not needed here).
+// Loads committee data (committees + every instalment row + every
+// committee's month history) to fold each person's committee net position
+// into their overall People-tab balance. Needs the full month history (not
+// just committees + instalments) because currentNetInvst is anchored to each
+// committee's last actually-filled kist, not just today's calendar date.
 async function loadCommitteeNetData() {
-  const [committeesResponse, instalmentsResponse] = await Promise.all([
-    committeeRequest({ action: 'committees' }),
-    committeeRequest({ action: 'committeeInstalments' }),
-  ]);
-  if (committeesResponse && committeesResponse.ok) committees = committeesResponse.committees || [];
-  if (instalmentsResponse && instalmentsResponse.ok) allCommitteeInstalments = instalmentsResponse.instalments || [];
+  const response = await committeeRequest({ action: 'committeeAnalysis' });
+  if (!response || !response.ok) return;
+  committees = response.committees || [];
+  allCommitteeInstalments = response.instalments || [];
+  analysisData = { committees: response.committees || [], instalments: response.instalments || [], months: response.months || [] };
 }
 
 // A person's current committee net (see currentNetInvst) summed across every
@@ -500,16 +500,32 @@ function renderAnalysisMonth() {
   }).join('');
 }
 
-// A committee's current net position, as of today (not a saved month) — same
-// sign convention as the backend's calendar-month rollup and "Net - <person>"
-// sheet: already taken = negative (owed back to the owner), not yet taken =
-// positive (still invested with the pot).
+// The kist actually reached so far for a committee — the latest month that's
+// been filled in (GHATA entered via Fill/Verify), NOT whatever the calendar
+// date says is "due". A committee's kist for the current calendar month isn't
+// real until it's actually been filled — until then, the last filled month
+// (e.g. August, while September is still outstanding) is the true position.
+// Returns null if nothing has been filled yet.
+function lastFilledKistNo(committee) {
+  const filledMonths = analysisData.months
+    .filter((m) => m.no === committee.no && (m.boliDate || m.ghata))
+    .map((m) => m.month);
+  if (!filledMonths.length) return null;
+  const lastMonth = filledMonths.reduce((max, m) => (m > max ? m : max), filledMonths[0]);
+  const idx = monthIndexFor(committee, lastMonth);
+  return idx === null ? null : Math.max(1, Math.min(committee.totalMonths, idx));
+}
+
+// A committee's current net position, as of the last kist actually filled in
+// (not today's calendar date — a month that's calendar-due but not yet paid
+// isn't real money yet). Same sign convention as the backend's calendar-month
+// rollup and "Net - <person>" sheet: already taken = negative (owed back to
+// the owner), not yet taken = positive (still invested with the pot).
 function currentNetInvst(committee, instalment) {
-  const idx = monthIndexFor(committee, currentYYYYMM());
-  const clampedIdx = idx === null ? 0 : Math.max(0, Math.min(committee.totalMonths, idx));
+  const clampedIdx = lastFilledKistNo(committee) || 0;
   const taken = Boolean(instalment && instalment.isTaken === 'Yes');
-  // Pending months counts down live from today's position, same as the
-  // calendar-month rollup — never frozen at whatever it was when the
+  // Pending months counts down from the last actually-filled kist, same as
+  // the calendar-month rollup — never frozen at whatever it was when the
   // committee was first marked taken. Mirrors refreshPersonNetSheet_.
   const pendingMonth = committee.totalMonths - clampedIdx;
   return taken ? -(pendingMonth * committee.monthlyAmount) : committee.monthlyAmount * clampedIdx;
@@ -567,20 +583,18 @@ function renderAnalysisPerson() {
               const inst = instalmentsByNo.get(c.no);
               const taken = inst && inst.isTaken === 'Yes';
               // Same figure and sign convention as the "Total Invst" column on
-              // the Aug-26-style calendar-month rollup sheets, but as of today
-              // rather than a saved calendar month — negative (still owed back
-              // to the owner) shown in red, positive (still invested with the
-              // pot) in green, via the same owed/owing classes as the balance pill.
+              // the calendar-month rollup sheets, but anchored to the last
+              // actually-filled kist rather than a saved calendar month —
+              // negative (still owed back to the owner) shown in red, positive
+              // (still invested with the pot) in green, via the same
+              // owed/owing classes as the balance pill.
               const invst = currentNetInvst(c, inst);
-              // Same "Kist #" shown on the Fill screen — this committee's own
-              // cycle position today, clamped to its actual timeline (a
-              // committee that hasn't started yet or has already run its
-              // course shows its first/last kist rather than an out-of-range number).
-              // totalMonths doubles as the member count (one payout per
-              // member per month), so this already covers a separate Members
-              // column.
-              const rawIdx = monthIndexFor(c, currentYYYYMM());
-              const kistNo = rawIdx === null ? null : Math.max(1, Math.min(c.totalMonths, rawIdx));
+              // Kist actually reached so far — not whatever the calendar date
+              // says is due (a month isn't real until it's been filled in via
+              // Fill/Verify). totalMonths doubles as the member count (one
+              // payout per member per month), so this already covers a
+              // separate Members column.
+              const kistNo = lastFilledKistNo(c);
               return `
               <tr>
                 <td>#${escapeHtml(c.no)}</td>

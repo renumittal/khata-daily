@@ -125,20 +125,21 @@ function addCommittee_(params) {
   refreshPersonNetSheet_(personOf_(committee.no));
 }
 
-// Corrects a committee's Start date after the fact (e.g. the real boli day
-// turns out to differ from what was first entered) — only the day-of-month
-// actually matters for anything derived from it (boliDateFor on the client,
-// sarkariGhataFor_'s month-position math is year+month only and is
-// unaffected), so this is safe to change without touching installment
-// numbers or pending-month counts.
-function updateCommitteeStartMonth_(no, startMonth) {
+// Corrects a committee's fixed fields after the fact (e.g. the real boli day
+// turns out to differ from what was first entered, or cutPercent was
+// mis-derived). Only startMonth's day-of-month and cutPercent are safe to
+// change this way without touching installment numbers or pending-month
+// counts — startMonth's year+month drives those, day-of-month doesn't.
+function updateCommitteeFields_(no, fields) {
   const sheet = getCommitteesSheet_();
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) throw new Error('No committees yet');
   const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
   const rowIndex = ids.findIndex((r) => String(r[0] || '') === no);
   if (rowIndex === -1) throw new Error('Committee not found: ' + no);
-  sheet.getRange(rowIndex + 2, 8).setValue(asText_(startMonth));
+  const row = rowIndex + 2;
+  if (fields.startMonth !== undefined && fields.startMonth !== '') sheet.getRange(row, 8).setValue(asText_(fields.startMonth));
+  if (fields.cutPercent !== undefined && fields.cutPercent !== '') sheet.getRange(row, 6).setValue(Number(fields.cutPercent) || 0);
 }
 
 function readCommitteeInstalments_(committeeNo) {
@@ -533,10 +534,23 @@ function readCalendarMonth_(yyyymm) {
 //
 // A person's CURRENT net across every committee THEY run (not just one
 // month) — same Total Invst sign convention as the calendar-month rollup,
-// but anchored to today rather than a saved calendar month. Rebuilt
-// whenever a committee is added or an instalment/month is saved for them.
-function currentYearMonth_() {
-  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM');
+// but anchored to the last kist actually filled in rather than a saved
+// calendar month. Rebuilt whenever a committee is added or an
+// instalment/month is saved for them.
+
+// A month that's calendar-due isn't real money yet until it's actually been
+// filled in via Fill/Verify — so "how far has this committee progressed" is
+// the latest month with a GHATA entered, not whatever today's date implies.
+// Returns 0 (clamped) if nothing has been filled yet, mirroring
+// lastFilledKistNo in app.js — keep both in sync.
+function lastFilledKistIdx_(committee) {
+  const filledMonths = readCommitteeMonths_(committee.no)
+    .filter((m) => m.boliDate || m.ghata)
+    .map((m) => m.month);
+  if (!filledMonths.length) return 0;
+  const lastMonth = filledMonths.reduce((max, m) => (m > max ? m : max), filledMonths[0]);
+  const idx = monthIndexFor_(committee, lastMonth);
+  return idx === null ? 0 : Math.max(0, Math.min(committee.totalMonths, idx));
 }
 
 function personNetSheetName_(person) {
@@ -558,21 +572,19 @@ function getPersonNetSheet_(person) {
 function refreshPersonNetSheet_(person) {
   if (!person) return;
   const sheet = getPersonNetSheet_(person);
-  const today = currentYearMonth_();
   const rows = [];
   let total = 0;
 
   readCommittees_()
     .filter((c) => personOf_(c.no).toLowerCase() === person.toLowerCase())
     .forEach((committee) => {
-      const idx = monthIndexFor_(committee, today);
-      const clampedIdx = idx === null ? 0 : Math.max(0, Math.min(committee.totalMonths, idx));
+      const clampedIdx = lastFilledKistIdx_(committee);
       const instalment = readCommitteeInstalments_(committee.no)[0];
       const taken = Boolean(instalment && instalment.isTaken === 'Yes');
-      // Pending months always counts down live from TODAY's position in the
-      // committee's timeline — it must NOT stay frozen at whatever it was
-      // when the committee was first marked taken, the same way the
-      // calendar-month rollup recomputes it fresh per target month.
+      // Pending months always counts down live from the last actually-filled
+      // kist — it must NOT stay frozen at whatever it was when the committee
+      // was first marked taken, the same way the calendar-month rollup
+      // recomputes it fresh per target month.
       const pendingMonth = committee.totalMonths - clampedIdx;
       const netInvst = taken ? -(pendingMonth * committee.monthlyAmount) : committee.monthlyAmount * clampedIdx;
       total += netInvst;

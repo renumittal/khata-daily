@@ -255,9 +255,9 @@ function doGet(e) {
     }
   }
 
-  if (params.action === 'updateCommitteeStartMonth') {
+  if (params.action === 'updateCommitteeFields') {
     try {
-      updateCommitteeStartMonth_(params.no, params.startMonth);
+      updateCommitteeFields_(params.no, { startMonth: params.startMonth, cutPercent: params.cutPercent });
       return respond(e, { ok: true });
     } catch (error) {
       return respond(e, { ok: false, error: String(error) });
