@@ -907,28 +907,38 @@ dialog::backdrop {
     font-size: 15px;
 }
 
-.month-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--line);
-    font-size: 13px;
+.table-scroll {
+    overflow-x: auto;
+    margin-bottom: 14px;
 }
 
-.month-row:last-child {
-    border-bottom: none;
+.table-scroll table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    min-width: 480px;
 }
 
-.month-row .month-label {
-    font-weight: 700;
-}
-
-.month-row .month-figures {
-    text-align: right;
+.table-scroll th {
+    text-align: left;
     color: var(--muted);
-    font-size: 12px;
+    font-weight: 700;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    padding: 8px 8px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+}
+
+.table-scroll td {
+    padding: 8px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+}
+
+.table-scroll tr:last-child td {
+    border-bottom: none;
 }
 
 @media (max-width: 430px) {

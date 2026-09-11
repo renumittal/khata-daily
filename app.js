@@ -51,6 +51,16 @@ function sarkariFor(committee, row) {
   const cut = (Number(committee.cutPercent) || 0) / 100;
   return Math.round(committee.monthlyAmount - committee.monthlyAmount * cut * (committee.totalMonths - idx));
 }
+// The floor GHATA for a given month: TotalMembers × MonthlyAmount × Cut% × (months
+// remaining after this one). The boli/auction discount actually entered that month
+// can't be lower than this — it's the guaranteed minimum cut.
+function sarkariGhataFor(committee, monthYYYYMM) {
+  if (!committee) return '';
+  const idx = monthIndexFor(committee, monthYYYYMM);
+  if (idx === null) return '';
+  const cut = (Number(committee.cutPercent) || 0) / 100;
+  return Math.max(0, Math.round(committee.totalMembers * committee.monthlyAmount * cut * (committee.totalMonths - idx)));
+}
 // KIST for a member this month = MonthlyAmount − (GHATA ÷ TotalMembers), the boli discount split evenly.
 function kistFor(committee, ghata) {
   if (!committee) return 0;
@@ -267,11 +277,19 @@ function renderMonthHistory() {
   const committee = committeeByNo(selectedCommitteeNo);
   const sorted = [...committeeMonths].sort((a, b) => b.month.localeCompare(a.month));
   $('monthHistoryEmpty').hidden = sorted.length > 0;
-  $('monthHistory').innerHTML = sorted.map((m) => `
-    <div class="month-row">
-      <span class="month-label">${escapeHtml(formatMonth(m.month))}</span>
-      <span class="month-figures">GHATA ${currency(m.ghata)}<br>KIST ${currency(m.kist)}/member${committee ? ` · Total ${currency(m.kist * committee.totalMembers)}` : ''}</span>
-    </div>`).join('');
+  $('monthHistory').innerHTML = sorted.map((m) => {
+    const takenRow = committeeInstalments.find((r) => r.takenMonth === m.month);
+    const received = committee ? m.kist * committee.totalMembers : m.kist;
+    const takenBy = takenRow ? `${escapeHtml(takenRow.person)}<br><small>${currency(received)}</small>` : '—';
+    return `
+    <tr>
+      <td>${escapeHtml(formatMonth(m.month))}</td>
+      <td>${currency(sarkariGhataFor(committee, m.month))}</td>
+      <td>${currency(m.ghata)}</td>
+      <td>${currency(m.kist)}</td>
+      <td>${takenBy}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderCommitteeInfo() {
@@ -285,18 +303,27 @@ function updateMonthPreview() {
   const committee = committeeByNo(selectedCommitteeNo);
   const ghata = Number($('m_ghata').value) || 0;
   const kist = kistFor(committee, ghata);
+  const minGhata = sarkariGhataFor(committee, $('m_month').value);
   $('m_kistPreview').textContent = currency(kist);
   $('m_kistTotal').textContent = currency(kist * (committee ? committee.totalMembers : 0));
   $('m_formula').textContent = committee
     ? `${currency(committee.monthlyAmount)} − (${currency(ghata)} ÷ ${committee.totalMembers} members) = ${currency(kist)} per member`
     : 'KIST = Monthly amount − (GHATA ÷ members)';
+  $('m_sarkariHint').textContent = minGhata !== '' ? `Sarkari minimum GHATA for this month: ${currency(minGhata)} — actual GHATA can't be entered lower than this.` : '';
 }
 
 async function saveCommitteeMonth() {
   const no = selectedCommitteeNo;
   const month = $('m_month').value;
   if (!no || !month) { showToast('Pick a committee and month'); return; }
-  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata: $('m_ghata').value });
+  const committee = committeeByNo(no);
+  const ghata = Number($('m_ghata').value) || 0;
+  const minGhata = sarkariGhataFor(committee, month);
+  if (minGhata !== '' && ghata < minGhata) {
+    showToast(`GHATA can't be less than the Sarkari minimum of ${currency(minGhata)}`);
+    return;
+  }
+  const response = await committeeRequest({ action: 'saveCommitteeMonth', no, month, ghata });
   if (!response || !response.ok) { showToast('Could not save — check the committee connection'); return; }
   showToast(`KIST set to ${currency(response.kist)} for every member`);
   await Promise.all([loadCommitteeMonths(), loadCommitteeInstalments()]);
@@ -330,6 +357,7 @@ function renderCommitteeInstalments() {
   const pending = pendingMonthsFor(committee);
   $('sumPending').textContent = pending === '' ? '—' : pending;
   $('sumTaken').textContent = committeeInstalments.filter((r) => r.isTaken === 'Yes').length;
+  renderMonthHistory();
 }
 
 async function saveInstalmentRow(index) {

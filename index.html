@@ -145,6 +145,7 @@
           <label>GHATA (₹)<input id="m_ghata" type="number" min="0"></label>
         </div>
         <p class="dialog-copy" id="m_formula">KIST = Monthly amount − (GHATA ÷ members)</p>
+        <p class="dialog-copy" id="m_sarkariHint"></p>
         <div class="stat-row">
           <div class="stat-box"><small>KIST per member</small><strong id="m_kistPreview">₹0</strong></div>
           <div class="stat-box"><small>Total KIST this month</small><strong id="m_kistTotal">₹0</strong></div>
@@ -154,7 +155,14 @@
         <div class="section-heading compact" style="margin-top:20px;">
           <div><p class="eyebrow">HISTORY</p><h2 style="font-size:15px;margin:0;">Month by month</h2></div>
         </div>
-        <div id="monthHistory"></div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th>Month</th><th>Sarkari GHATA</th><th>Actual GHATA</th><th>KIST/member</th><th>Taken by</th></tr>
+            </thead>
+            <tbody id="monthHistory"></tbody>
+          </table>
+        </div>
         <div class="empty-state" id="monthHistoryEmpty" hidden><span>◈</span><p>No months saved yet</p><small>Save a month above to start the history.</small></div>
 
         <div class="stat-row" style="margin-top:20px;">
