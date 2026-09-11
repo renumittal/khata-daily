@@ -219,8 +219,22 @@ function switchCommitteeSub(sub, preselectNo) {
   committeeSub = sub;
   ['list', 'add', 'instalments'].forEach((name) => { $(`committeeSub-${name}`).hidden = name !== sub; });
   document.querySelectorAll('.type-switch [data-csub]').forEach((button) => button.classList.toggle('active', button.dataset.csub === sub));
-  if (sub === 'add') $('c_no').innerHTML = '<option value="">Pick a person</option>' + people.map((name) => `<option>${escapeHtml(name)}</option>`).join('');
+  if (sub === 'add') {
+    $('c_no').innerHTML = '<option value="">Pick a person</option>' + people.map((name) => `<option>${escapeHtml(name)}</option>`).join('');
+    $('c_existingHint').textContent = '';
+  }
   if (sub === 'instalments') populateCommitteeSelect(preselectNo || selectedCommitteeNo);
+}
+
+// Shows any committees the selected person already has, so a second one for
+// the same person (a new round, say) is a visible, deliberate choice rather
+// than something that could look like an accidental duplicate.
+function showExistingCommitteesHint() {
+  const person = $('c_no').value;
+  const existing = committees.filter((c) => personOf(c.no) === person);
+  $('c_existingHint').textContent = existing.length
+    ? `${person} already has: ${existing.map((c) => c.no).join(', ')}. Saving will add another, separate committee.`
+    : '';
 }
 
 async function loadCommittees() {
@@ -597,6 +611,7 @@ function updateCommitteePreview() {
   if (end) parts.push(`Runs ${formatDate(start)} → ${formatDate(end)}`);
   $('c_preview').textContent = parts.length ? parts.join(' · ') : 'Months and the monthly instalment are worked out automatically from the total amount, member count, and start date.';
 }
+$('c_no').addEventListener('change', showExistingCommitteesHint);
 $('c_members').addEventListener('input', updateCommitteePreview);
 $('c_totalLakhs').addEventListener('input', updateCommitteePreview);
 $('c_start').addEventListener('input', updateCommitteePreview);
