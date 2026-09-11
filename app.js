@@ -306,12 +306,19 @@ function renderMonthHistory() {
   $('m_openEmpty').hidden = !!open || !sorted.length;
   $('m_currentMonthLabel').textContent = '';
 
+  // Sarkari GHATA and Boli date are pure functions of the committee's own
+  // numbers (cut%, start date) and don't depend on anything being saved yet —
+  // compute them fresh client-side for every row instead of trusting
+  // whatever the sheet happened to have (which for never-touched future rows
+  // is just whatever the committee looked like the moment it was created).
   $('monthHistory').innerHTML = sorted.map((m) => {
+    const sarkariGhata = sarkariGhataFor(committee, m.month);
+    const boliDate = m.boliDate || boliDateFor(committee, m.month);
     if (m.month !== open) {
       return `
       <tr class="${m.takenBy ? 'month-taken' : ''}">
-        <td>${m.boliDate ? formatDate(m.boliDate) : '—'}</td>
-        <td>${currency(m.sarkariGhata)}</td>
+        <td>${boliDate ? formatDate(boliDate) : '—'}</td>
+        <td>${currency(sarkariGhata)}</td>
         <td>${m.ghata || m.boliDate ? currency(m.ghata) : '—'}</td>
         <td>${m.ghata || m.boliDate ? currency(m.kist) : '—'}</td>
         <td>${m.takenBy ? `Yes<br><small>${currency(m.amountReceived)}</small>` : 'No'}</td>
@@ -323,11 +330,10 @@ function renderMonthHistory() {
     }
     const record = committeeInstalments[0];
     const takenSelected = record && record.isTaken === 'Yes' && record.takenMonth === m.month;
-    const boliDate = boliDateFor(committee, m.month);
     return `
     <tr class="month-open">
       <td>${boliDate ? formatDate(boliDate) : '—'}</td>
-      <td>${currency(m.sarkariGhata)}</td>
+      <td>${currency(sarkariGhata)}</td>
       <td><input id="m_ghata" type="number" min="0" value="${m.ghata || ''}"></td>
       <td id="m_kistCell">${currency(kistFor(committee, m.ghata))}</td>
       <td><select id="m_taken"><option ${!takenSelected ? 'selected' : ''}>No</option><option ${takenSelected ? 'selected' : ''}>Yes</option></select></td>
