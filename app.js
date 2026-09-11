@@ -246,12 +246,16 @@ async function loadCommittees() {
   if (committeeSub === 'instalments') populateCommitteeSelect(selectedCommitteeNo);
 }
 
+// A committee's "no" is "Person (start date)" so the same person can run more than
+// one committee — strip the date back off when only the person's name is wanted.
+function personOf(no) { return String(no || '').replace(/\s*\(.*\)$/, ''); }
+
 function renderCommittees() {
   $('committeeEmpty').hidden = committees.length > 0;
   $('committeeEmpty').querySelector('p').textContent = 'No committees yet';
   $('committeeList').innerHTML = committees.map((c) => `
     <div class="person-summary-row committee-row" data-no="${escapeHtml(c.no)}">
-      <div class="person-avatar">${escapeHtml(c.no)}</div>
+      <div class="person-avatar">${escapeHtml(personOf(c.no).charAt(0).toUpperCase())}</div>
       <div class="person-summary-main">
         <div class="person-summary-name">Committee #${escapeHtml(c.no)}</div>
         <div class="person-summary-meta">${c.totalMembers} members · ${c.totalMonths} months · ${currency(c.monthlyAmount)}/month${c.startMonth ? ` · ${escapeHtml(formatDate(c.startMonth))} → ${escapeHtml(formatDate(committeeEndDate(c)))}` : ''}</div>
@@ -598,8 +602,14 @@ $('c_start').addEventListener('input', updateCommitteePreview);
 
 $('committeeForm').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const no = $('c_no').value.trim();
-  if (!no) { showToast('Pick a committee person'); return; }
+  const person = $('c_no').value.trim();
+  if (!person) { showToast('Pick a committee person'); return; }
+  const start = $('c_start').value;
+  if (!start) { showToast('Pick a start date'); return; }
+  // The start date is folded into the identifier so the same person can run more
+  // than one committee (e.g. two different rounds) without them colliding —
+  // this also makes them easy to tell apart in the committee list and dropdown.
+  const no = `${person} (${formatDate(start)})`;
   const { totalMembers, totalAmount, monthlyAmount } = committeeTotalsFromForm();
   const response = await committeeRequest({
     action: 'addCommittee', no,
