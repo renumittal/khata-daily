@@ -553,7 +553,7 @@ function renderAnalysisPerson() {
       </div>
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Committee</th><th>Status</th><th>Members</th><th>Total pot</th><th>Start</th><th>Taken</th><th>Total Invst</th></tr></thead>
+          <thead><tr><th>Committee</th><th>Kist #</th><th>Status</th><th>Members</th><th>Total pot</th><th>Start</th><th>Taken</th><th>Total Invst</th></tr></thead>
           <tbody>
             ${list.map((c) => {
               const inst = instalmentsByNo.get(c.no);
@@ -564,9 +564,16 @@ function renderAnalysisPerson() {
               // to the owner) shown in red, positive (still invested with the
               // pot) in green, via the same owed/owing classes as the balance pill.
               const invst = currentNetInvst(c, inst);
+              // Same "Kist #" shown on the Fill screen — this committee's own
+              // cycle position today, clamped to its actual timeline (a
+              // committee that hasn't started yet or has already run its
+              // course shows its first/last kist rather than an out-of-range number).
+              const rawIdx = monthIndexFor(c, currentYYYYMM());
+              const kistNo = rawIdx === null ? null : Math.max(1, Math.min(c.totalMonths, rawIdx));
               return `
               <tr>
                 <td>#${escapeHtml(c.no)}</td>
+                <td>${kistNo !== null ? `${kistNo}/${c.totalMonths}` : '—'}</td>
                 <td>${escapeHtml(c.status || 'Running')}</td>
                 <td>${c.totalMembers}</td>
                 <td>${currency(c.totalAmount)}</td>
