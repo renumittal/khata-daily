@@ -339,10 +339,9 @@ function updateMonthPreview() {
   $('m_formula').textContent = committee
     ? `${currency(committee.monthlyAmount)} − (${currency(ghata)} ÷ ${committee.totalMembers} members) = ${currency(kist)} per member`
     : 'KIST = Monthly amount − (GHATA ÷ members)';
-  const monthCountText = monthIndex !== null && committee ? `Month ${monthIndex} of ${committee.totalMonths}. ` : '';
-  $('m_sarkariHint').textContent = minGhata !== ''
-    ? `${monthCountText}Sarkari minimum GHATA for this month: ${currency(minGhata)} — actual GHATA can't be entered lower than this.`
-    : '';
+  $('m_monthIndex').textContent = monthIndex !== null && committee ? `${monthIndex} of ${committee.totalMonths}` : '—';
+  $('m_sarkariGhata').textContent = minGhata !== '' ? currency(minGhata) : '₹0';
+  $('m_sarkariHint').textContent = minGhata !== '' ? "Actual GHATA can't be entered lower than the Sarkari minimum above." : '';
   const boliDate = boliDateFor(committee, boliMonth());
   $('m_boliDatePreview').textContent = boliDate ? `Boli date: ${formatDate(boliDate)}` : '';
 }
