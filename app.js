@@ -1,6 +1,4 @@
 const STORAGE_KEY = 'khata-daily-entries';
-const ENDPOINT_KEY = 'khata-daily-endpoint';
-const DEFAULT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxtJtyY1DnAwUXSQyKFiOGiMHZDuHZufY56SCplgJoat-huT1CR0PF4YPPzS6cv0i9Ckw/exec';
 let entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 let showingAll = false;
 let people = [];
@@ -111,24 +109,16 @@ function formatDate(value) { return new Date(`${value}T00:00:00`).toLocaleDateSt
 function showToast(message) { const toast = $('toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2600); }
 function setSyncState(online) { $('syncStatus').classList.toggle('online', online); $('syncStatus').innerHTML = `<i></i> ${online ? 'Connected' : 'Local'}`; }
 
-function jsonpRequest(params, timeoutMs = 12000, endpointOverride) {
-  const endpoint = endpointOverride || localStorage.getItem(ENDPOINT_KEY) || DEFAULT_ENDPOINT;
-  if (!endpoint) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const callbackName = `khataCb${Date.now()}${Math.random().toString(36).slice(2)}`;
-    const cleanup = () => { delete window[callbackName]; script.remove(); };
-    const timer = setTimeout(() => { cleanup(); resolve(null); }, timeoutMs);
-    window[callbackName] = (response) => { clearTimeout(timer); cleanup(); resolve(response); };
-    const search = new URLSearchParams({ ...params, callback: callbackName });
-    const script = document.createElement('script');
-    script.src = `${endpoint}${endpoint.includes('?') ? '&' : '?'}${search.toString()}`;
-    script.onerror = () => { clearTimeout(timer); cleanup(); resolve(null); };
-    document.body.appendChild(script);
-  });
+// Talks to Supabase via apiRequest() (see supabase-client.js), which takes
+// the exact same { action, ...params } shape the old Google Apps Script
+// JSONP endpoint did and returns the same-shaped { ok, ... } payload — so
+// every call site below is unchanged from the Sheets-backed version.
+function jsonpRequest(params) {
+  return apiRequest(params);
 }
 
-function committeeRequest(params, timeoutMs = 12000) {
-  return jsonpRequest(params, timeoutMs);
+function committeeRequest(params) {
+  return apiRequest(params);
 }
 
 async function syncEntry(entry) {
@@ -1012,7 +1002,7 @@ $('entryForm').addEventListener('submit', async (event) => {
 $('clearFilter').addEventListener('click', () => { showingAll = !showingAll; render(); });
 
 document.querySelectorAll('.tab-button[data-view]').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
-$('settingsTabButton').addEventListener('click', () => { $('endpoint').value = localStorage.getItem(ENDPOINT_KEY) || ''; $('settingsDialog').showModal(); loadAllPeople(); });
+$('settingsTabButton').addEventListener('click', () => { $('settingsDialog').showModal(); loadAllPeople(); });
 $('peopleSearch').addEventListener('input', renderPeopleDirectory);
 $('peopleDirectory').addEventListener('click', (event) => {
   const row = event.target.closest('.person-summary-row');
@@ -1034,7 +1024,7 @@ $('personAddEntryButton').addEventListener('click', () => {
   const card = document.querySelector(`.person-card[data-person="${CSS.escape(person)}"]`);
   if (card) { card.scrollIntoView({ behavior:'smooth', block:'center' }); card.querySelector('.person-amount').focus(); }
 });
-$('settingsForm').addEventListener('submit', (event) => { event.preventDefault(); localStorage.setItem(ENDPOINT_KEY, $('endpoint').value.trim()); $('settingsDialog').close(); showToast('Connection saved, checking...'); loadPeople(); });
+$('settingsForm').addEventListener('submit', (event) => { event.preventDefault(); $('settingsDialog').close(); });
 document.querySelectorAll('#committeeView > .type-switch [data-csub]').forEach((button) => button.addEventListener('click', () => switchCommitteeSub(button.dataset.csub)));
 document.querySelectorAll('#committeeSub-manage [data-msub]').forEach((button) => button.addEventListener('click', () => switchManageSub(button.dataset.msub)));
 document.querySelectorAll('.type-switch [data-areport]').forEach((button) => button.addEventListener('click', () => switchAnalysisReport(button.dataset.areport)));

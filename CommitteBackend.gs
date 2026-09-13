@@ -142,6 +142,33 @@ function updateCommitteeFields_(no, fields) {
   if (fields.cutPercent !== undefined && fields.cutPercent !== '') sheet.getRange(row, 6).setValue(Number(fields.cutPercent) || 0);
 }
 
+// Renames a committee's "no" everywhere it's used as an identifier: the
+// Committees row itself, its Committee Instalments row, and its "Kameti - <no>"
+// sheet's name — needed when the placeholder date first used to name it (e.g.
+// day-of-month "1" before the real boli day was known) turns out wrong.
+// Calendar-month rollups aren't touched here; they read committee.no fresh
+// from Committees on every refresh, so the next refresh picks up the new name
+// on its own.
+function renameCommittee_(oldNo, newNo) {
+  if (!oldNo || !newNo || oldNo === newNo) throw new Error('Need distinct oldNo and newNo');
+
+  const committeesSheet = getCommitteesSheet_();
+  const lastRow = committeesSheet.getLastRow();
+  const ids = lastRow > 1 ? committeesSheet.getRange(2, 1, lastRow - 1, 1).getValues() : [];
+  const rowIndex = ids.findIndex((r) => String(r[0] || '') === oldNo);
+  if (rowIndex === -1) throw new Error('Committee not found: ' + oldNo);
+  committeesSheet.getRange(rowIndex + 2, 1).setValue(newNo);
+
+  const instSheet = getCommitteeInstalmentsSheet_();
+  readCommitteeInstalments_(oldNo).forEach((entry) => {
+    instSheet.getRange(entry.row, 1).setValue(newNo);
+  });
+
+  const spreadsheet = getSpreadsheet();
+  const oldSheet = spreadsheet.getSheetByName(committeeSheetName_(oldNo));
+  if (oldSheet) oldSheet.setName(committeeSheetName_(newNo));
+}
+
 function readCommitteeInstalments_(committeeNo) {
   const sheet = getCommitteeInstalmentsSheet_();
   const lastRow = sheet.getLastRow();

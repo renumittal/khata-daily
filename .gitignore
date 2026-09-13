@@ -1,0 +1,8 @@
+# One-time Supabase migration inputs — real personal data (names, amounts,
+# committee details) pulled from the Sheet. Already loaded into Supabase by
+# migrate.py; not needed going forward and must not be pushed to this public repo.
+supabase/people.json
+supabase/transactions.json
+supabase/committee_analysis.json
+
+.DS_Store

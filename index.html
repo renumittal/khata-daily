@@ -229,12 +229,6 @@
   <dialog id="settingsDialog">
     <form method="dialog" class="dialog-card" id="settingsForm">
       <button class="close-button" value="cancel" aria-label="Close settings">×</button>
-      <p class="eyebrow">CONNECTION</p><h2>Google Sheet</h2>
-      <p class="dialog-copy">Paste your deployed Google Apps Script web app URL to sync entries automatically.</p>
-      <label>Apps Script URL<input id="endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec"></label>
-      <p class="dialog-copy">This one connection covers both the ledger and Committees — CommitteBackend.gs shares this same deployment.</p>
-      <button class="primary-button" value="default" type="submit">Save connection</button>
-
       <p class="eyebrow">PEOPLE</p><h2>Manage names</h2>
       <p class="dialog-copy">Add someone new, or hide someone you no longer split money with. Their past entries stay in the Sheet either way.</p>
       <div class="add-person-row">
@@ -247,6 +241,8 @@
     </form>
   </dialog>
   <div class="toast" id="toast" role="status"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="supabase-client.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

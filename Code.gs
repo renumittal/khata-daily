@@ -264,6 +264,15 @@ function doGet(e) {
     }
   }
 
+  if (params.action === 'renameCommittee') {
+    try {
+      renameCommittee_(params.oldNo, params.newNo);
+      return respond(e, { ok: true });
+    } catch (error) {
+      return respond(e, { ok: false, error: String(error) });
+    }
+  }
+
   if (params.action === 'renameInstalmentPerson') {
     try {
       renameInstalmentPerson_(params.no, params.newPerson);
