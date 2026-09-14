@@ -3,6 +3,7 @@ let entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 let showingAll = false;
 let people = [];
 let transactionType = 'credit';
+let personEntryType = 'credit';
 let selectedPerson = null;
 let personFilter = 'all';
 let remoteTransactions = [];
@@ -1018,11 +1019,42 @@ document.querySelectorAll('#personDetailView .filter-switch .type-option').forEa
   document.querySelectorAll('#personDetailView .filter-switch .type-option').forEach((btn) => btn.classList.toggle('active', btn === button));
   renderPersonDetail();
 }));
+function setPersonEntryType(type) {
+  personEntryType = type;
+  $('personEntryCreditButton').classList.toggle('active', type === 'credit');
+  $('personEntryDebitButton').classList.toggle('active', type === 'debit');
+}
+$('personEntryCreditButton').addEventListener('click', () => setPersonEntryType('credit'));
+$('personEntryDebitButton').addEventListener('click', () => setPersonEntryType('debit'));
+
 $('personAddEntryButton').addEventListener('click', () => {
-  const person = selectedPerson;
-  switchView('home');
-  const card = document.querySelector(`.person-card[data-person="${CSS.escape(person)}"]`);
-  if (card) { card.scrollIntoView({ behavior:'smooth', block:'center' }); card.querySelector('.person-amount').focus(); }
+  $('personEntryFor').textContent = `FOR ${selectedPerson.toUpperCase()}`;
+  setPersonEntryType('credit');
+  $('personEntryAmount').value = '';
+  $('personEntryDate').value = today();
+  $('personEntryPurpose').value = '';
+  $('personEntryDialog').showModal();
+  $('personEntryAmount').focus();
+});
+
+$('personEntrySaveButton').addEventListener('click', async () => {
+  const amount = Number($('personEntryAmount').value);
+  if (!amount || amount <= 0) { showToast('Enter an amount'); return; }
+  const entry = {
+    id:crypto.randomUUID(),
+    type:personEntryType,
+    category:'',
+    person:selectedPerson,
+    amount,
+    date:$('personEntryDate').value || today(),
+    note:$('personEntryPurpose').value.trim(),
+    createdAt:new Date().toISOString(),
+  };
+  entries.push(entry); localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  render(); renderPeople(); renderPersonDetail(); renderPeopleDirectory();
+  $('personEntryDialog').close();
+  const ok = await syncEntry(entry);
+  showToast(ok ? 'Saved and synced to Google Sheet' : 'Saved on this phone');
 });
 $('settingsForm').addEventListener('submit', (event) => { event.preventDefault(); $('settingsDialog').close(); });
 document.querySelectorAll('#committeeView > .type-switch [data-csub]').forEach((button) => button.addEventListener('click', () => switchCommitteeSub(button.dataset.csub)));

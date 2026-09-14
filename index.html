@@ -99,6 +99,24 @@
       <button class="primary-button sticky-add" id="personAddEntryButton" type="button"><span>＋</span> Add entry</button>
     </section>
 
+    <dialog id="personEntryDialog">
+      <form method="dialog" class="dialog-card" id="personEntryForm">
+        <button class="close-button" value="cancel" aria-label="Close">×</button>
+        <p class="eyebrow" id="personEntryFor">FOR</p>
+        <h2>Add entry</h2>
+        <div class="type-switch" role="group" aria-label="Transaction type">
+          <button type="button" class="type-option active" id="personEntryCreditButton" data-type="credit">Credit<small>Money in</small></button>
+          <button type="button" class="type-option" id="personEntryDebitButton" data-type="debit">Debit<small>Money out</small></button>
+        </div>
+        <label>Amount<input id="personEntryAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount" required></label>
+        <div class="field-row">
+          <label>Date<input id="personEntryDate" type="date" required></label>
+          <label>Purpose (optional)<input id="personEntryPurpose" type="text" placeholder="Purpose"></label>
+        </div>
+        <button class="primary-button" id="personEntrySaveButton" type="button"><span>＋</span> Save entry</button>
+      </form>
+    </dialog>
+
     <section id="committeeView" class="view" hidden>
       <div class="section-heading">
         <div><p class="eyebrow">KAMETI</p><h2 class="view-title">Committees</h2></div>
