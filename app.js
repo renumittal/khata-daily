@@ -168,7 +168,7 @@ async function loadPeople() {
 function renderManagePeople(list) {
   $('managePeopleList').innerHTML = list.length ? list.map((entry) => `
     <div class="manage-person-row">
-      <span>${escapeHtml(entry.name)}</span>
+      <span>${escapeHtml(entry.name)}${entry.mobile ? `<small class="dialog-copy"> · ${escapeHtml(entry.mobile)}</small>` : ''}</span>
       <button type="button" class="status-toggle${entry.active ? ' active' : ''}" data-name="${escapeHtml(entry.name)}" data-active="${entry.active}">${entry.active ? 'Active' : 'Inactive'}</button>
     </div>`).join('') : '<small class="dialog-copy">No names yet — add one above.</small>';
 }
@@ -183,11 +183,13 @@ async function loadAllPeople() {
 async function addPerson() {
   const name = $('newPersonName').value.trim();
   if (!name) return;
+  const mobile = $('newPersonMobile').value.trim();
   $('addPersonButton').disabled = true;
-  const response = await jsonpRequest({ action:'addPerson', name });
+  const response = await jsonpRequest({ action:'addPerson', name, mobile });
   $('addPersonButton').disabled = false;
   if (!response || !response.ok) { showToast('Could not add name'); return; }
   $('newPersonName').value = '';
+  $('newPersonMobile').value = '';
   showToast(`${name} added`);
   await Promise.all([loadAllPeople(), loadPeople()]);
 }
@@ -1148,6 +1150,7 @@ $('saveMonthViewButton').addEventListener('click', saveMonthView);
 $('committeeVerifySubmitButton').addEventListener('click', submitCommitteeVerification);
 $('addPersonButton').addEventListener('click', addPerson);
 $('newPersonName').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addPerson(); } });
+$('newPersonMobile').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addPerson(); } });
 $('managePeopleList').addEventListener('click', (event) => {
   const button = event.target.closest('.status-toggle');
   if (!button) return;

@@ -16,7 +16,8 @@
 
 create table if not exists people (
   name text primary key,
-  active boolean not null default true
+  active boolean not null default true,
+  mobile text default ''
 );
 
 create table if not exists transactions (

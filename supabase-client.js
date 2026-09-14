@@ -77,14 +77,14 @@ async function apiRequest(params) {
     }
 
     if (action === 'allPeople' || !action) {
-      const { data, error } = await db.from('people').select('name, active').order('name');
+      const { data, error } = await db.from('people').select('name, active, mobile').order('name');
       if (error) throw error;
       if (!action) return { ok: true, people: [...new Set(data.filter((p) => p.active).map((p) => p.name))].sort() };
-      return { ok: true, people: data.map((p) => ({ name: p.name, active: p.active })) };
+      return { ok: true, people: data.map((p) => ({ name: p.name, active: p.active, mobile: p.mobile || '' })) };
     }
 
     if (action === 'addPerson') {
-      const { error } = await db.from('people').upsert({ name: params.name, active: true });
+      const { error } = await db.from('people').upsert({ name: params.name, active: true, mobile: params.mobile || '' });
       if (error) throw error;
       return { ok: true };
     }

@@ -526,18 +526,16 @@ dialog::backdrop {
 
 .add-person-row {
     display: flex;
+    flex-direction: column;
     gap: 8px;
     margin-bottom: 14px;
 }
 
 .add-person-row input {
-    flex: 1;
     margin: 0;
 }
 
 .add-person-row button {
-    width: auto;
-    padding: 0 18px;
     margin: 0;
 }
 
