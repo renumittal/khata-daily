@@ -1162,4 +1162,21 @@ render();
 switchView('people');
 loadPeople();
 loadUnverified();
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+// iOS home-screen PWAs can sit backgrounded for days without ever checking
+// for a new sw.js on their own, so a shipped fix silently never reaches the
+// phone until someone thinks to force-quit it. Explicitly re-check whenever
+// the app comes back to the foreground, and once a new service worker takes
+// over, reload so the newly-fetched index.html/app.js actually run instead
+// of the old ones staying alive in memory.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then((registration) => {
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') registration.update(); });
+    window.addEventListener('focus', () => registration.update());
+  });
+  let refreshingForUpdate = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshingForUpdate) return;
+    refreshingForUpdate = true;
+    window.location.reload();
+  });
+}
