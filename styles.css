@@ -143,11 +143,44 @@ h2 {
 }
 
 .entry-panel {
+    margin: 22px 0;
     padding: 22px;
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 8px;
     box-shadow: 0 10px 30px rgba(77,61,40,.06);
+}
+
+.entry-panel > summary.section-heading {
+    cursor: pointer;
+    list-style: none;
+}
+
+.entry-panel > summary.section-heading::-webkit-details-marker {
+    display: none;
+}
+
+.entry-panel > summary.section-heading::after {
+    content: '⌄';
+    font-size: 18px;
+    color: var(--muted);
+    transition: transform .15s ease;
+}
+
+.entry-panel[open] > summary.section-heading::after {
+    transform: rotate(180deg);
+}
+
+.entry-panel > summary.section-heading .sync-pill {
+    margin-right: 4px;
+}
+
+.entry-panel > form {
+    margin-top: 20px;
+}
+
+.entry-panel:not([open]) > summary.section-heading {
+    margin-bottom: 0;
 }
 
 .section-heading {

@@ -20,14 +20,20 @@
     </header>
 
     <section id="peopleView" class="view">
-      <section class="entry-panel">
-        <div class="section-heading">
+      <p class="eyebrow">LEDGER</p>
+      <h2 class="view-title">People</h2>
+      <input id="peopleSearch" class="search-input" type="search" placeholder="Search a name">
+      <div class="people-directory" id="peopleDirectory"></div>
+      <div class="empty-state" id="peopleDirectoryEmpty" hidden><span>◎</span><p>No people yet</p><small>Add names from Settings → Manage names.</small></div>
+
+      <details class="entry-panel">
+        <summary class="section-heading">
           <div>
             <p class="eyebrow">NEW ENTRY</p>
-            <h2>Record a transaction</h2>
+            <h2>Record for multiple people</h2>
           </div>
           <span class="sync-pill" id="syncStatus"><i></i> Local</span>
-        </div>
+        </summary>
         <form id="entryForm">
           <div class="type-switch" role="group" aria-label="Transaction type">
             <button type="button" class="type-option active" id="creditButton" data-type="credit">Credit<small>Money in</small></button>
@@ -37,13 +43,7 @@
           <div class="people-list" id="peopleList"><div class="people-placeholder">Add names from Settings → Manage names.</div></div>
           <button class="primary-button" type="submit"><span>＋</span> Save transaction</button>
         </form>
-      </section>
-
-      <p class="eyebrow">LEDGER</p>
-      <h2 class="view-title">People</h2>
-      <input id="peopleSearch" class="search-input" type="search" placeholder="Search a name">
-      <div class="people-directory" id="peopleDirectory"></div>
-      <div class="empty-state" id="peopleDirectoryEmpty" hidden><span>◎</span><p>No people yet</p><small>Add names from Settings → Manage names.</small></div>
+      </details>
 
       <section class="ledger-section">
         <div class="section-heading compact">
