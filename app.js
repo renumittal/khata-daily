@@ -162,6 +162,7 @@ async function loadPeople() {
   }
   people = response.people || [];
   renderPeople();
+  renderPeopleDirectory();
   setSyncState(true);
 }
 
@@ -243,7 +244,6 @@ function personSummary(name) {
 }
 
 function switchView(view) {
-  $('homeView').hidden = view !== 'home';
   $('peopleView').hidden = view !== 'people';
   $('verifyView').hidden = view !== 'verify';
   $('personDetailView').hidden = view !== 'personDetail';
@@ -1159,7 +1159,7 @@ $('managePeopleList').addEventListener('click', (event) => {
 $('verifySubmitButton').addEventListener('click', submitVerification);
 $('exportButton').addEventListener('click', () => { const blob = new Blob([JSON.stringify(entries, null, 2)], { type:'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `khata-daily-${today()}.json`; link.click(); URL.revokeObjectURL(link.href); });
 render();
+switchView('people');
 loadPeople();
-loadTransactions();
 loadUnverified();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
