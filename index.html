@@ -71,12 +71,22 @@
 
     <section id="personDetailView" class="view" hidden>
       <div class="detail-header">
-        <button type="button" class="icon-button" id="personBackButton" aria-label="Back to people">‹</button>
-        <div>
-          <h2 id="personDetailName">Name</h2>
-          <small id="personDetailMeta" class="dialog-copy">0 entries</small>
+        <div class="detail-header-main">
+          <button type="button" class="icon-button" id="personBackButton" aria-label="Back to people">‹</button>
+          <div>
+            <h2 id="personDetailName">Name</h2>
+            <small id="personDetailMeta" class="dialog-copy">0 entries</small>
+          </div>
         </div>
+        <button type="button" class="icon-button primary" id="personAddEntryButton" aria-label="Add entry">＋</button>
       </div>
+      <div class="type-switch filter-switch" role="group" aria-label="Filter transactions">
+        <button type="button" class="type-option active" data-filter="all">All</button>
+        <button type="button" class="type-option" data-filter="credit">Credit</button>
+        <button type="button" class="type-option" data-filter="debit">Debit</button>
+      </div>
+      <div class="transaction-list" id="personTransactionList"></div>
+      <div class="empty-state" id="personTransactionEmpty" hidden><span>◎</span><p>No transactions</p><small>Nothing recorded for this person yet.</small></div>
       <div class="person-balance-card" id="personBalanceCard">
         <span class="balance-label" id="personBalanceLabel">Settled</span>
         <strong id="personBalanceAmount">₹0</strong>
@@ -87,19 +97,11 @@
         </div>
         <p class="dialog-copy" id="personCommitteeNote" hidden></p>
       </div>
-      <div class="type-switch filter-switch" role="group" aria-label="Filter transactions">
-        <button type="button" class="type-option active" data-filter="all">All</button>
-        <button type="button" class="type-option" data-filter="credit">Credit</button>
-        <button type="button" class="type-option" data-filter="debit">Debit</button>
-      </div>
-      <div class="transaction-list" id="personTransactionList"></div>
-      <div class="empty-state" id="personTransactionEmpty" hidden><span>◎</span><p>No transactions</p><small>Nothing recorded for this person yet.</small></div>
-      <button class="primary-button sticky-add" id="personAddEntryButton" type="button"><span>＋</span> Add entry</button>
     </section>
 
     <dialog id="personEntryDialog">
       <form method="dialog" class="dialog-card" id="personEntryForm">
-        <button class="close-button" value="cancel" aria-label="Close">×</button>
+        <button class="close-button" id="personEntryCloseButton" type="button" aria-label="Close">×</button>
         <p class="eyebrow" id="personEntryFor">FOR</p>
         <h2>Add entry</h2>
         <div class="type-switch" role="group" aria-label="Transaction type">

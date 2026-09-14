@@ -1026,6 +1026,7 @@ function setPersonEntryType(type) {
   $('personEntryCreditButton').classList.toggle('active', type === 'credit');
   $('personEntryDebitButton').classList.toggle('active', type === 'debit');
 }
+$('personEntryCloseButton').addEventListener('click', () => $('personEntryDialog').close());
 $('personEntryCreditButton').addEventListener('click', () => setPersonEntryType('credit'));
 $('personEntryDebitButton').addEventListener('click', () => setPersonEntryType('debit'));
 

@@ -796,12 +796,27 @@ dialog::backdrop {
 .detail-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 10px;
     margin-bottom: 18px;
 }
 
+.detail-header-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
 .detail-header h2 {
     font-size: 20px;
+}
+
+.icon-button.primary {
+    background: var(--green);
+    border-color: var(--green);
+    color: #fff;
+    flex-shrink: 0;
 }
 
 .person-balance-card {
@@ -809,7 +824,7 @@ dialog::backdrop {
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 18px;
-    margin-bottom: 16px;
+    margin-top: 16px;
 }
 
 .person-balance-card.owed strong {
