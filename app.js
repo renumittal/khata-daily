@@ -1420,16 +1420,24 @@ async function openProjectPay(projectId, projectName) {
   $('pp_date').value = today();
   $('pp_membersList').innerHTML = '<div class="people-placeholder">Pick a group to see its people.</div>';
   $('pp_membersStatus').textContent = '';
-  $('pp_fromSelect').innerHTML = '<option value="">Who\'s giving the money</option>' + peopleOptions();
+  $('pp_fromSelect').innerHTML = '<option value="">Who\'s giving the money</option>';
   $('pp_toPersonSelect').innerHTML = '<option value="">Who\'s receiving</option>' + peopleOptions();
   $('pp_personAmount').value = ''; $('pp_personNote').value = '';
   switchProjectPayTo('person');
   switchView('projectPay');
-  const groupsRes = await jsonpRequest({ action: 'projectGroups', projectId });
+  const [groupsRes, levelsRes] = await Promise.all([
+    jsonpRequest({ action: 'projectGroups', projectId }),
+    jsonpRequest({ action: 'listAuthLevels' }),
+  ]);
   const groupList = (groupsRes && groupsRes.ok) ? groupsRes.groups : [];
   $('pp_groupSelect').innerHTML = groupList.length
     ? '<option value="">Pick a group</option>' + groupList.map((g) => `<option value="${g.groupId}">${escapeHtml(g.groupName)}</option>`).join('')
     : '<option value="">No groups linked — link one from Access → Projects</option>';
+  // From is scoped to auth level 2+ names for now (e.g. Manager/Anil/Parveen)
+  // rather than the full people list, until a real "who's using the app"
+  // identity exists — see Access > Levels.
+  const fromLevels = ((levelsRes && levelsRes.ok) ? levelsRes.levels : []).filter((l) => l.rank >= 2).sort((a, b) => a.rank - b.rank);
+  $('pp_fromSelect').innerHTML = '<option value="">Who\'s giving the money</option>' + fromLevels.map((l) => `<option>${escapeHtml(l.name)}</option>`).join('');
 }
 
 async function loadProjectPayMembers() {
