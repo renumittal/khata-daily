@@ -317,6 +317,14 @@
 
       <div class="access-sub" id="accessSub-projects" hidden>
         <div class="manage-people-list" id="ap_projectList"><small class="dialog-copy">No projects yet.</small></div>
+        <p class="dialog-copy">Tap a project above to pay a group. Manage which groups belong to a project below.</p>
+        <label>Project<select id="ap_projectSelect"></select></label>
+        <p class="dialog-copy">Groups linked to this project</p>
+        <div class="manage-people-list" id="ap_linkedGroupsList"><small class="dialog-copy">No project selected.</small></div>
+        <div class="add-person-row">
+          <select id="ap_addGroupSelect"></select>
+          <button class="primary-button" id="ap_linkGroupButton" type="button">Link group</button>
+        </div>
         <p class="eyebrow">NEW PROJECT</p>
         <div class="add-person-row">
           <input id="ap_newProjectName" type="text" placeholder="Project name">

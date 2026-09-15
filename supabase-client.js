@@ -303,6 +303,24 @@ async function apiRequest(params) {
       return { ok: true };
     }
 
+    if (action === 'projectGroups') {
+      const { data, error } = await db.from('group_project').select('id, group_id, groups(name)').eq('project_id', params.projectId).is('valid_to', null);
+      if (error) throw error;
+      return { ok: true, groups: data.map((r) => ({ id: r.id, groupId: r.group_id, groupName: r.groups ? r.groups.name : '' })) };
+    }
+
+    if (action === 'linkGroupProject') {
+      const { error } = await db.from('group_project').insert({ group_id: params.groupId, project_id: params.projectId });
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    if (action === 'unlinkGroupProject') {
+      const { error } = await db.from('group_project').update({ valid_to: new Date().toISOString().slice(0, 10) }).eq('id', params.id);
+      if (error) throw error;
+      return { ok: true };
+    }
+
     return { ok: false, error: `Unknown action: ${action}` };
   } catch (error) {
     console.error('Supabase request failed', action, error);

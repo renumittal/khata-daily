@@ -123,6 +123,18 @@ create table if not exists person_project (
 );
 create unique index if not exists uq_person_project_active on person_project(person, project_id) where valid_to is null;
 
+-- Which groups are assigned to which project (e.g. "Labour" linked to both
+-- "95 Guj" and "115 guj") — lets Project Pay's group picker show only
+-- groups actually assigned to that project instead of every group.
+create table if not exists group_project (
+  id bigserial primary key,
+  group_id bigint not null references groups(id),
+  project_id bigint not null references project(id),
+  valid_from date not null default current_date,
+  valid_to date
+);
+create unique index if not exists uq_group_project_active on group_project(group_id, project_id) where valid_to is null;
+
 create table if not exists committees (
   no text primary key,                 -- e.g. "Renu (2026-06-05)"
   total_members int not null default 0,
@@ -431,6 +443,7 @@ alter table auth_level_group enable row level security;
 alter table auth_level_person enable row level security;
 alter table project enable row level security;
 alter table person_project enable row level security;
+alter table group_project enable row level security;
 
 drop policy if exists "anon read/write" on people;
 drop policy if exists "anon read/write" on transactions;
@@ -445,6 +458,7 @@ drop policy if exists "anon read/write" on auth_level_group;
 drop policy if exists "anon read/write" on auth_level_person;
 drop policy if exists "anon read/write" on project;
 drop policy if exists "anon read/write" on person_project;
+drop policy if exists "anon read/write" on group_project;
 
 create policy "anon read/write" on people for all using (true) with check (true);
 create policy "anon read/write" on transactions for all using (true) with check (true);
@@ -459,3 +473,4 @@ create policy "anon read/write" on auth_level_group for all using (true) with ch
 create policy "anon read/write" on auth_level_person for all using (true) with check (true);
 create policy "anon read/write" on project for all using (true) with check (true);
 create policy "anon read/write" on person_project for all using (true) with check (true);
+create policy "anon read/write" on group_project for all using (true) with check (true);

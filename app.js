@@ -1332,21 +1332,62 @@ $('at_addUserButton').addEventListener('click', async () => {
   await loadAppUsers();
 });
 
+let selectedPayProjectId = null;
+
 async function loadProjects() {
   const response = await jsonpRequest({ action: 'listProjects' });
   if (!response || !response.ok) { showToast('Could not load projects'); return; }
   const projects = response.projects || [];
   $('ap_projectList').innerHTML = projects.length ? projects.map((p) => `
-    <div class="manage-person-row" data-project-name="${escapeHtml(p.name)}" role="button" tabindex="0">
+    <div class="manage-person-row" data-project-id="${p.id}" data-project-name="${escapeHtml(p.name)}" role="button" tabindex="0">
       <span>${escapeHtml(p.name)}</span>
       <small class="dialog-copy">${escapeHtml([p.location, p.status].filter(Boolean).join(' · ')) || 'Tap to pay a group'}</small>
     </div>`).join('') : '<small class="dialog-copy">No projects yet.</small>';
+  const keepSelection = projects.some((p) => String(p.id) === String(selectedPayProjectId));
+  $('ap_projectSelect').innerHTML = projects.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('') || '<option value="">No projects yet</option>';
+  if (projects.length) { $('ap_projectSelect').value = keepSelection ? selectedPayProjectId : projects[0].id; loadLinkedGroups(); }
+  else { selectedPayProjectId = null; $('ap_linkedGroupsList').innerHTML = '<small class="dialog-copy">No projects yet — add one below.</small>'; }
 }
 
+async function loadLinkedGroups() {
+  selectedPayProjectId = $('ap_projectSelect').value;
+  if (!selectedPayProjectId) return;
+  const [linkedRes, allRes] = await Promise.all([
+    jsonpRequest({ action: 'projectGroups', projectId: selectedPayProjectId }),
+    jsonpRequest({ action: 'listGroups' }),
+  ]);
+  const linked = (linkedRes && linkedRes.ok) ? linkedRes.groups : [];
+  const allGroups = (allRes && allRes.ok) ? allRes.groups : [];
+  $('ap_linkedGroupsList').innerHTML = linked.length ? linked.map((g) => `
+    <div class="manage-person-row">
+      <span>${escapeHtml(g.groupName)}</span>
+      <button type="button" class="text-button" data-unlink-group="${g.id}">Unlink</button>
+    </div>`).join('') : '<small class="dialog-copy">No groups linked yet.</small>';
+  const linkedIds = new Set(linked.map((g) => String(g.groupId)));
+  const available = allGroups.filter((g) => !linkedIds.has(String(g.id)));
+  $('ap_addGroupSelect').innerHTML = available.length ? available.map((g) => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('') : '<option value="">No groups left to link</option>';
+}
+
+$('ap_projectSelect').addEventListener('change', loadLinkedGroups);
+$('ap_linkGroupButton').addEventListener('click', async () => {
+  const groupId = $('ap_addGroupSelect').value;
+  if (!groupId || !selectedPayProjectId) return;
+  const response = await jsonpRequest({ action: 'linkGroupProject', projectId: selectedPayProjectId, groupId });
+  if (!response || !response.ok) { showToast('Could not link group'); return; }
+  await loadLinkedGroups();
+});
+$('ap_linkedGroupsList').addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-unlink-group]');
+  if (!button) return;
+  const response = await jsonpRequest({ action: 'unlinkGroupProject', id: button.dataset.unlinkGroup });
+  if (!response || !response.ok) { showToast('Could not unlink group'); return; }
+  await loadLinkedGroups();
+});
+
 $('ap_projectList').addEventListener('click', (event) => {
-  const row = event.target.closest('[data-project-name]');
+  const row = event.target.closest('[data-project-id]');
   if (!row) return;
-  openProjectPay(row.dataset.projectName);
+  openProjectPay(row.dataset.projectId, row.dataset.projectName);
 });
 
 $('ap_addProjectButton').addEventListener('click', async () => {
@@ -1368,19 +1409,21 @@ document.querySelectorAll('#accessView > .type-switch [data-asub]').forEach((but
 
 // ---------- Project Pay: pay a group for a project, with a distributor float ----------
 
-async function openProjectPay(projectName) {
+async function openProjectPay(projectId, projectName) {
   $('projectPayName').textContent = projectName;
   $('pp_date').value = today();
   $('pp_membersList').innerHTML = '<div class="people-placeholder">Pick a group to see its people.</div>';
   $('pp_membersStatus').textContent = '';
   switchView('projectPay');
   const [groupsRes, usersRes] = await Promise.all([
-    jsonpRequest({ action: 'listGroups' }),
+    jsonpRequest({ action: 'projectGroups', projectId }),
     jsonpRequest({ action: 'listAppUsers' }),
   ]);
   const groupList = (groupsRes && groupsRes.ok) ? groupsRes.groups : [];
   const users = (usersRes && usersRes.ok) ? usersRes.users : [];
-  $('pp_groupSelect').innerHTML = '<option value="">Pick a group</option>' + groupList.map((g) => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
+  $('pp_groupSelect').innerHTML = groupList.length
+    ? '<option value="">Pick a group</option>' + groupList.map((g) => `<option value="${g.groupId}">${escapeHtml(g.groupName)}</option>`).join('')
+    : '<option value="">No groups linked — link one from Access → Projects</option>';
   $('pp_distributorSelect').innerHTML = '<option value="">Pick who\'s paying</option>' + users.map((u) => `<option value="${u.id}" data-username="${escapeHtml(u.username)}">${escapeHtml(u.username)} (${escapeHtml(u.levelName || 'no level')})</option>`).join('');
 }
 
