@@ -1359,7 +1359,7 @@ async function loadProjects() {
   const keepSelection = projects.some((p) => String(p.id) === String(selectedPayProjectId));
   $('ap_projectSelect').innerHTML = projects.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('') || '<option value="">No projects yet</option>';
   if (projects.length) { $('ap_projectSelect').value = keepSelection ? selectedPayProjectId : projects[0].id; loadLinkedGroups(); }
-  else { selectedPayProjectId = null; $('ap_linkedGroupsList').innerHTML = '<small class="dialog-copy">No projects yet — add one below.</small>'; $('ap_hierarchyView').innerHTML = '<small class="dialog-copy">No project selected.</small>'; }
+  else { selectedPayProjectId = null; $('ap_linkedGroupsList').innerHTML = '<small class="dialog-copy">No projects yet — add one below.</small>'; }
 }
 
 $('ap_allProjectsList').addEventListener('click', (event) => {
@@ -1386,16 +1386,15 @@ async function loadLinkedGroups() {
   const linkedIds = new Set(linked.map((g) => String(g.groupId)));
   const available = allGroups.filter((g) => !linkedIds.has(String(g.id)));
   $('ap_addGroupSelect').innerHTML = available.length ? available.map((g) => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('') : '<option value="">No groups left to link</option>';
-  await renderProjectHierarchy(linked);
 }
 
-// For each group linked to the selected project, show who can access it
-// (its levels) and who's in it (its members) — the downward chain from
-// project to group to level/person.
-async function renderProjectHierarchy(linkedGroups) {
-  const projectName = $('ap_projectSelect').selectedOptions[0] ? $('ap_projectSelect').selectedOptions[0].textContent : '';
+// For each group linked to a project, show who can access it (its levels)
+// and who's in it (its members) — the downward chain from project to
+// group to level/person. Lives on the project's own page (Project Pay),
+// not the generic Access > Projects admin screen.
+async function renderProjectHierarchy(targetId, projectName, linkedGroups) {
   if (!linkedGroups.length) {
-    $('ap_hierarchyView').innerHTML = `<div class="hierarchy-node">${escapeHtml(projectName)}</div><div class="hierarchy-leaf">No groups linked yet.</div>`;
+    $(targetId).innerHTML = `<div class="hierarchy-node">${escapeHtml(projectName)}</div><div class="hierarchy-leaf">No groups linked yet — link one from Access → Projects.</div>`;
     return;
   }
   const details = await Promise.all(linkedGroups.map(async (g) => {
@@ -1409,7 +1408,7 @@ async function renderProjectHierarchy(linkedGroups) {
       members: (membersRes && membersRes.ok) ? membersRes.members : [],
     };
   }));
-  $('ap_hierarchyView').innerHTML = `<div class="hierarchy-node">${escapeHtml(projectName)}</div>` + details.map((g) => `
+  $(targetId).innerHTML = `<div class="hierarchy-node">${escapeHtml(projectName)}</div>` + details.map((g) => `
     <div class="hierarchy-children">
       <div class="hierarchy-node">Group: ${escapeHtml(g.name)}</div>
       <div class="hierarchy-children">
@@ -1514,6 +1513,7 @@ async function openProjectPay(projectId, projectName) {
   // identity exists — see Access > Levels.
   const fromLevels = ((levelsRes && levelsRes.ok) ? levelsRes.levels : []).filter((l) => l.rank >= 2).sort((a, b) => a.rank - b.rank);
   $('pp_fromSelect').innerHTML = '<option value="">Who\'s giving the money</option>' + fromLevels.map((l) => `<option>${escapeHtml(l.name)}</option>`).join('');
+  renderProjectHierarchy('pp_hierarchyView', projectName, groupList);
 }
 
 async function loadProjectPayMembers() {
