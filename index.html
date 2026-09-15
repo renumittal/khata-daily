@@ -19,7 +19,13 @@
       </div>
     </header>
 
-    <section id="peopleView" class="view">
+    <section id="homeView" class="view">
+      <p class="eyebrow">PROJECTS</p>
+      <h2 class="view-title">Home</h2>
+      <div class="people-directory" id="homeProjectList"><small class="dialog-copy">No projects yet — add one from Access → Projects.</small></div>
+    </section>
+
+    <section id="peopleView" class="view" hidden>
       <p class="eyebrow">LEDGER</p>
       <h2 class="view-title">People</h2>
       <input id="peopleSearch" class="search-input" type="search" placeholder="Search a name">
@@ -319,8 +325,7 @@
       </div>
 
       <div class="access-sub" id="accessSub-projects" hidden>
-        <div class="manage-people-list" id="ap_projectList"><small class="dialog-copy">No projects yet.</small></div>
-        <p class="dialog-copy">Tap a project above to pay a group. Manage which groups belong to a project below.</p>
+        <p class="dialog-copy">Browse and pay projects from the Home tab. Manage which groups belong to a project here.</p>
         <label>Project<select id="ap_projectSelect"></select></label>
         <p class="dialog-copy">Groups linked to this project</p>
         <div class="manage-people-list" id="ap_linkedGroupsList"><small class="dialog-copy">No project selected.</small></div>
@@ -341,7 +346,8 @@
   </main>
 
   <nav class="tab-bar" aria-label="Sections">
-    <button type="button" class="tab-button active" data-view="people"><span class="tab-icon">⌂</span>Home</button>
+    <button type="button" class="tab-button active" data-view="home"><span class="tab-icon">⌂</span>Home</button>
+    <button type="button" class="tab-button" data-view="people"><span class="tab-icon">▤</span>Khata</button>
     <button type="button" class="tab-button" data-view="verify"><span class="tab-icon">✓</span>Verify<span class="tab-badge" id="verifyBadge" hidden>0</span></button>
     <button type="button" class="tab-button" data-view="committee"><span class="tab-icon">◈</span>Committee</button>
     <button type="button" class="tab-button" data-view="access"><span class="tab-icon">▦</span>Access</button>

@@ -249,6 +249,7 @@ function personSummary(name) {
 }
 
 function switchView(view) {
+  $('homeView').hidden = view !== 'home';
   $('peopleView').hidden = view !== 'people';
   $('verifyView').hidden = view !== 'verify';
   $('personDetailView').hidden = view !== 'personDetail';
@@ -256,6 +257,7 @@ function switchView(view) {
   $('accessView').hidden = view !== 'access';
   $('projectPayView').hidden = view !== 'projectPay';
   document.querySelectorAll('.tab-button[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view || (view === 'personDetail' && button.dataset.view === 'people')));
+  if (view === 'home') loadHomeProjects();
   if (view === 'people') {
     renderPeopleDirectory();
     Promise.all([loadTransactions(), loadCommitteeNetData()]).then(() => { if (!$('peopleView').hidden) renderPeopleDirectory(); });
@@ -1315,11 +1317,6 @@ async function loadProjects() {
   const response = await jsonpRequest({ action: 'listProjects' });
   if (!response || !response.ok) { showToast('Could not load projects'); return; }
   const projects = response.projects || [];
-  $('ap_projectList').innerHTML = projects.length ? projects.map((p) => `
-    <div class="manage-person-row" data-project-id="${p.id}" data-project-name="${escapeHtml(p.name)}" role="button" tabindex="0">
-      <span>${escapeHtml(p.name)}</span>
-      <small class="dialog-copy">${escapeHtml([p.location, p.status].filter(Boolean).join(' · ')) || 'Tap to pay a group'}</small>
-    </div>`).join('') : '<small class="dialog-copy">No projects yet.</small>';
   const keepSelection = projects.some((p) => String(p.id) === String(selectedPayProjectId));
   $('ap_projectSelect').innerHTML = projects.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('') || '<option value="">No projects yet</option>';
   if (projects.length) { $('ap_projectSelect').value = keepSelection ? selectedPayProjectId : projects[0].id; loadLinkedGroups(); }
@@ -1361,7 +1358,21 @@ $('ap_linkedGroupsList').addEventListener('click', async (event) => {
   await loadLinkedGroups();
 });
 
-$('ap_projectList').addEventListener('click', (event) => {
+async function loadHomeProjects() {
+  const response = await jsonpRequest({ action: 'listProjects' });
+  if (!response || !response.ok) { showToast('Could not load projects'); return; }
+  const projects = response.projects || [];
+  $('homeProjectList').innerHTML = projects.length ? projects.map((p) => `
+    <div class="person-summary-row" data-project-id="${p.id}" data-project-name="${escapeHtml(p.name)}">
+      <div class="person-avatar">${escapeHtml(p.name.charAt(0).toUpperCase())}</div>
+      <div class="person-summary-main">
+        <div class="person-summary-name">${escapeHtml(p.name)}</div>
+        <div class="person-summary-meta">${escapeHtml([p.location, p.status].filter(Boolean).join(' · ')) || 'Tap to pay someone'}</div>
+      </div>
+    </div>`).join('') : '<small class="dialog-copy">No projects yet — add one from Access → Projects.</small>';
+}
+
+$('homeProjectList').addEventListener('click', (event) => {
   const row = event.target.closest('[data-project-id]');
   if (!row) return;
   openProjectPay(row.dataset.projectId, row.dataset.projectName);
@@ -1440,7 +1451,7 @@ async function loadProjectPayMembers() {
 
 document.querySelectorAll('#projectPayView [data-ppto]').forEach((button) => button.addEventListener('click', () => switchProjectPayTo(button.dataset.ppto)));
 $('pp_groupSelect').addEventListener('change', loadProjectPayMembers);
-$('projectPayBackButton').addEventListener('click', () => switchView('access'));
+$('projectPayBackButton').addEventListener('click', () => switchView('home'));
 
 $('pp_saveButton').addEventListener('click', async () => {
   const projectName = $('projectPayName').textContent;
@@ -1478,11 +1489,11 @@ $('pp_saveButton').addEventListener('click', async () => {
   render(); renderPeople(); renderPeopleDirectory();
   const results = await Promise.all(newEntries.map(syncEntry));
   showToast(results.every(Boolean) ? `Paid ${recipients.length} ${recipients.length === 1 ? 'person' : 'people'}` : 'Saved on this phone');
-  switchView('access');
+  switchView('home');
 });
 
 render();
-switchView('people');
+switchView('home');
 loadPeople();
 loadUnverified();
 // iOS home-screen PWAs can sit backgrounded for days without ever checking
