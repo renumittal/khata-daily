@@ -128,7 +128,7 @@ function committeeRequest(params) {
 }
 
 async function syncEntry(entry) {
-  const response = await jsonpRequest({ action:'save', id:entry.id, date:entry.date, type:entry.type, person:entry.person, category:entry.category || '', amount:String(entry.amount), note:entry.note || '', createdAt:entry.createdAt });
+  const response = await jsonpRequest({ action:'save', id:entry.id, date:entry.date, type:entry.type, person:entry.person, category:entry.category || '', amount:String(entry.amount), note:entry.note || '', createdAt:entry.createdAt, project:entry.project || undefined, paidByUser:entry.paidByUser || undefined });
   const ok = Boolean(response && response.ok);
   setSyncState(ok);
   return ok;
@@ -254,6 +254,7 @@ function switchView(view) {
   $('personDetailView').hidden = view !== 'personDetail';
   $('committeeView').hidden = view !== 'committee';
   $('accessView').hidden = view !== 'access';
+  $('projectPayView').hidden = view !== 'projectPay';
   document.querySelectorAll('.tab-button[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view || (view === 'personDetail' && button.dataset.view === 'people')));
   if (view === 'people') {
     renderPeopleDirectory();
@@ -1336,11 +1337,17 @@ async function loadProjects() {
   if (!response || !response.ok) { showToast('Could not load projects'); return; }
   const projects = response.projects || [];
   $('ap_projectList').innerHTML = projects.length ? projects.map((p) => `
-    <div class="manage-person-row">
+    <div class="manage-person-row" data-project-name="${escapeHtml(p.name)}" role="button" tabindex="0">
       <span>${escapeHtml(p.name)}</span>
-      <small class="dialog-copy">${escapeHtml([p.location, p.status].filter(Boolean).join(' · '))}</small>
+      <small class="dialog-copy">${escapeHtml([p.location, p.status].filter(Boolean).join(' · ')) || 'Tap to pay a group'}</small>
     </div>`).join('') : '<small class="dialog-copy">No projects yet.</small>';
 }
+
+$('ap_projectList').addEventListener('click', (event) => {
+  const row = event.target.closest('[data-project-name]');
+  if (!row) return;
+  openProjectPay(row.dataset.projectName);
+});
 
 $('ap_addProjectButton').addEventListener('click', async () => {
   const name = $('ap_newProjectName').value.trim();
@@ -1358,6 +1365,78 @@ $('ap_addProjectButton').addEventListener('click', async () => {
 });
 
 document.querySelectorAll('#accessView > .type-switch [data-asub]').forEach((button) => button.addEventListener('click', () => switchAccessSub(button.dataset.asub)));
+
+// ---------- Project Pay: pay a group for a project, with a distributor float ----------
+
+async function openProjectPay(projectName) {
+  $('projectPayName').textContent = projectName;
+  $('pp_date').value = today();
+  $('pp_membersList').innerHTML = '<div class="people-placeholder">Pick a group to see its people.</div>';
+  $('pp_membersStatus').textContent = '';
+  switchView('projectPay');
+  const [groupsRes, usersRes] = await Promise.all([
+    jsonpRequest({ action: 'listGroups' }),
+    jsonpRequest({ action: 'listAppUsers' }),
+  ]);
+  const groupList = (groupsRes && groupsRes.ok) ? groupsRes.groups : [];
+  const users = (usersRes && usersRes.ok) ? usersRes.users : [];
+  $('pp_groupSelect').innerHTML = '<option value="">Pick a group</option>' + groupList.map((g) => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
+  $('pp_distributorSelect').innerHTML = '<option value="">Pick who\'s paying</option>' + users.map((u) => `<option value="${u.id}" data-username="${escapeHtml(u.username)}">${escapeHtml(u.username)} (${escapeHtml(u.levelName || 'no level')})</option>`).join('');
+}
+
+async function loadProjectPayMembers() {
+  const groupId = $('pp_groupSelect').value;
+  if (!groupId) { $('pp_membersList').innerHTML = '<div class="people-placeholder">Pick a group to see its people.</div>'; $('pp_membersStatus').textContent = ''; return; }
+  const response = await jsonpRequest({ action: 'groupMembers', groupId });
+  const members = (response && response.ok) ? response.members : [];
+  $('pp_membersStatus').textContent = `${members.length} people`;
+  $('pp_membersList').innerHTML = members.length ? members.map((m) => `
+    <div class="person-card" data-person="${escapeHtml(m.person)}">
+      <div class="person-card-top">
+        <span>${escapeHtml(m.person)}</span>
+        <input class="person-amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount">
+      </div>
+      <div class="person-card-fields">
+        <input class="person-purpose" type="text" placeholder="Note (optional)">
+      </div>
+    </div>`).join('') : '<div class="people-placeholder">No one in this group yet — add members from Access → Groups.</div>';
+}
+
+$('pp_groupSelect').addEventListener('change', loadProjectPayMembers);
+$('projectPayBackButton').addEventListener('click', () => switchView('access'));
+
+$('pp_saveButton').addEventListener('click', async () => {
+  const projectName = $('projectPayName').textContent;
+  const distributorOption = $('pp_distributorSelect').selectedOptions[0];
+  const distributorId = $('pp_distributorSelect').value;
+  const distributorUsername = distributorOption ? distributorOption.dataset.username : '';
+  const date = $('pp_date').value || today();
+  const cards = [...document.querySelectorAll('#pp_membersList .person-card')].filter((card) => Number(card.querySelector('.person-amount').value) > 0);
+  if (!distributorId) { showToast('Pick who is paying'); return; }
+  if (!cards.length) { showToast('Enter an amount for at least one person'); return; }
+
+  const newEntries = [];
+  cards.forEach((card) => {
+    const memberName = card.dataset.person;
+    const amount = Number(card.querySelector('.person-amount').value);
+    const note = card.querySelector('.person-purpose').value.trim();
+    const createdAt = new Date().toISOString();
+    newEntries.push({
+      id: crypto.randomUUID(), type: 'credit', category: '', person: memberName, amount, date,
+      note: note || `Wages via ${distributorUsername}`, createdAt, project: projectName, paidByUser: distributorId,
+    });
+    newEntries.push({
+      id: crypto.randomUUID(), type: 'debit', category: '', person: distributorUsername, amount, date,
+      note: `Paid to ${memberName}`, createdAt, project: projectName, paidByUser: distributorId,
+    });
+  });
+
+  entries.push(...newEntries); localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  render(); renderPeople(); renderPeopleDirectory();
+  const results = await Promise.all(newEntries.map(syncEntry));
+  showToast(results.every(Boolean) ? `Paid ${cards.length} people` : 'Saved on this phone');
+  switchView('access');
+});
 
 render();
 switchView('people');

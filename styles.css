@@ -597,6 +597,10 @@ dialog::backdrop {
     white-space: nowrap;
 }
 
+.manage-person-row[role="button"] {
+    cursor: pointer;
+}
+
 .status-toggle {
     border: 1px solid var(--line);
     background: var(--paper);

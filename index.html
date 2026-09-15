@@ -117,6 +117,25 @@
       </form>
     </dialog>
 
+    <section id="projectPayView" class="view" hidden>
+      <div class="detail-header">
+        <div class="detail-header-main">
+          <button type="button" class="icon-button" id="projectPayBackButton" aria-label="Back to projects">‹</button>
+          <div>
+            <h2 id="projectPayName">Project</h2>
+            <small class="dialog-copy">Pay a group for this project</small>
+          </div>
+        </div>
+      </div>
+      <label>Group<select id="pp_groupSelect"><option value="">Pick a group</option></select></label>
+      <div class="people-heading"><span>People and amounts</span><small id="pp_membersStatus"></small></div>
+      <div class="people-list" id="pp_membersList"><div class="people-placeholder">Pick a group to see its people.</div></div>
+      <label>Paid by<select id="pp_distributorSelect"><option value="">Pick who's paying</option></select></label>
+      <p class="dialog-copy">The distributor must already exist as a name in Home/People with the exact same name as their username — their side of each payment attaches to that name.</p>
+      <label>Date<input id="pp_date" type="date"></label>
+      <button class="primary-button" id="pp_saveButton" type="button"><span>＋</span> Pay group</button>
+    </section>
+
     <section id="committeeView" class="view" hidden>
       <div class="section-heading">
         <div><p class="eyebrow">KAMETI</p><h2 class="view-title">Committees</h2></div>

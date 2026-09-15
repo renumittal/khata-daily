@@ -50,6 +50,7 @@ async function apiRequest(params) {
         id: params.id, date: params.date, type: params.type, person: params.person,
         category: params.category || '', amount: Number(params.amount), note: params.note || '',
         created_at: params.createdAt,
+        project: params.project || null, paid_by_user: params.paidByUser || null,
       });
       if (error) throw error;
       return { ok: true };
