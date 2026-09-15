@@ -297,6 +297,8 @@
       </div>
 
       <div class="access-sub" id="accessSub-groups" hidden>
+        <p class="dialog-copy">All groups — tap one to manage it below</p>
+        <div class="people-directory" id="ag_allGroupsList"><small class="dialog-copy">No groups yet.</small></div>
         <label>Group<select id="ag_groupSelect"></select></label>
         <p class="dialog-copy" id="ag_membersHeading">Members</p>
         <div class="manage-people-list" id="ag_membersList"><small class="dialog-copy">No group selected.</small></div>
@@ -313,6 +315,8 @@
       </div>
 
       <div class="access-sub" id="accessSub-levels" hidden>
+        <p class="dialog-copy">All levels — tap one to manage it below</p>
+        <div class="people-directory" id="al_allLevelsList"><small class="dialog-copy">No levels yet.</small></div>
         <label>Auth level<select id="al_levelSelect"></select></label>
         <p class="dialog-copy">Groups granted to this level</p>
         <div class="manage-people-list" id="al_groupsList"><small class="dialog-copy">No level selected.</small></div>
@@ -336,7 +340,8 @@
       </div>
 
       <div class="access-sub" id="accessSub-projects" hidden>
-        <p class="dialog-copy">Browse and pay projects from the Home tab. Manage which groups belong to a project here.</p>
+        <p class="dialog-copy">All projects — tap one to manage it below. Pay from the Home tab.</p>
+        <div class="people-directory" id="ap_allProjectsList"><small class="dialog-copy">No projects yet.</small></div>
         <label>Project<select id="ap_projectSelect"></select></label>
         <p class="dialog-copy">Groups linked to this project</p>
         <div class="manage-people-list" id="ap_linkedGroupsList"><small class="dialog-copy">No project selected.</small></div>
@@ -344,6 +349,8 @@
           <select id="ap_addGroupSelect"></select>
           <button class="primary-button" id="ap_linkGroupButton" type="button">Link group</button>
         </div>
+        <p class="dialog-copy">Hierarchy — how this project links downward</p>
+        <div id="ap_hierarchyView" class="hierarchy-view"><small class="dialog-copy">No project selected.</small></div>
         <p class="eyebrow">NEW PROJECT</p>
         <div class="add-person-row">
           <input id="ap_newProjectName" type="text" placeholder="Project name">

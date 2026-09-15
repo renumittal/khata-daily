@@ -249,6 +249,12 @@ async function apiRequest(params) {
       return { ok: true, groups: data.map((r) => ({ id: r.id, groupId: r.group_id, groupName: r.groups ? r.groups.name : '' })) };
     }
 
+    if (action === 'groupLevels') {
+      const { data, error } = await db.from('auth_level_group').select('id, auth_level_id, auth_level(name, rank)').eq('group_id', params.groupId).is('valid_to', null);
+      if (error) throw error;
+      return { ok: true, levels: data.map((r) => ({ id: r.id, levelId: r.auth_level_id, levelName: r.auth_level ? r.auth_level.name : '', rank: r.auth_level ? r.auth_level.rank : null })) };
+    }
+
     if (action === 'grantLevelGroup') {
       const { error } = await db.from('auth_level_group').insert({ auth_level_id: params.levelId, group_id: params.groupId });
       if (error) throw error;

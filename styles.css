@@ -976,6 +976,36 @@ dialog::backdrop {
     margin-top: 22px;
 }
 
+.hierarchy-view {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 14px;
+    font-size: 13px;
+}
+
+.hierarchy-node {
+    font-weight: 700;
+    color: var(--ink);
+    margin: 8px 0 2px;
+}
+
+.hierarchy-node:first-child {
+    margin-top: 0;
+}
+
+.hierarchy-children {
+    margin: 0 0 0 16px;
+    padding-left: 12px;
+    border-left: 1px solid var(--line);
+}
+
+.hierarchy-leaf {
+    color: var(--muted);
+    padding: 2px 0;
+}
+
 .stat-row {
     display: grid;
     grid-template-columns: repeat(3,1fr);

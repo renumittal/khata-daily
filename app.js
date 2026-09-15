@@ -1186,11 +1186,26 @@ async function loadGroups() {
   const response = await jsonpRequest({ action: 'listGroups' });
   if (!response || !response.ok) { showToast('Could not load groups'); return; }
   groups = response.groups || [];
+  $('ag_allGroupsList').innerHTML = groups.length ? groups.map((g) => `
+    <div class="person-summary-row" data-group-id="${g.id}" role="button" tabindex="0">
+      <div class="person-avatar">${escapeHtml(g.name.charAt(0).toUpperCase())}</div>
+      <div class="person-summary-main">
+        <div class="person-summary-name">${escapeHtml(g.name)}</div>
+        <div class="person-summary-meta">${g.memberCount} ${g.memberCount === 1 ? 'member' : 'members'}${g.description ? ` · ${escapeHtml(g.description)}` : ''}</div>
+      </div>
+    </div>`).join('') : '<small class="dialog-copy">No groups yet — add one below.</small>';
   const keepSelection = groups.some((g) => String(g.id) === String(selectedGroupId));
   $('ag_groupSelect').innerHTML = groups.map((g) => `<option value="${g.id}">${escapeHtml(g.name)} (${g.memberCount})</option>`).join('') || '<option value="">No groups yet</option>';
   if (groups.length) { $('ag_groupSelect').value = keepSelection ? selectedGroupId : groups[0].id; loadGroupMembers(); }
   else { selectedGroupId = null; $('ag_membersList').innerHTML = '<small class="dialog-copy">No groups yet — add one below.</small>'; }
 }
+
+$('ag_allGroupsList').addEventListener('click', (event) => {
+  const row = event.target.closest('[data-group-id]');
+  if (!row) return;
+  $('ag_groupSelect').value = row.dataset.groupId;
+  loadGroupMembers();
+});
 
 async function loadGroupMembers() {
   selectedGroupId = $('ag_groupSelect').value;
@@ -1236,13 +1251,28 @@ $('ag_addGroupButton').addEventListener('click', async () => {
 async function loadAuthLevels() {
   const response = await jsonpRequest({ action: 'listAuthLevels' });
   if (!response || !response.ok) { showToast('Could not load levels'); return; }
-  authLevels = response.levels || [];
+  authLevels = (response.levels || []).slice().sort((a, b) => a.rank - b.rank);
+  $('al_allLevelsList').innerHTML = authLevels.length ? authLevels.map((l) => `
+    <div class="person-summary-row" data-level-id="${l.id}" role="button" tabindex="0">
+      <div class="person-avatar">${escapeHtml(l.name.charAt(0).toUpperCase())}</div>
+      <div class="person-summary-main">
+        <div class="person-summary-name">${escapeHtml(l.name)}</div>
+        <div class="person-summary-meta">Rank ${l.rank}${l.description ? ` · ${escapeHtml(l.description)}` : ''}</div>
+      </div>
+    </div>`).join('') : '<small class="dialog-copy">No levels yet — add one below.</small>';
   const options = authLevels.map((l) => `<option value="${l.id}">${escapeHtml(l.name)} (rank ${l.rank})</option>`).join('');
   const keepSelection = authLevels.some((l) => String(l.id) === String(selectedLevelId));
   $('al_levelSelect').innerHTML = options || '<option value="">No levels yet</option>';
   if (authLevels.length) { $('al_levelSelect').value = keepSelection ? selectedLevelId : authLevels[0].id; loadLevelDetails(); }
   else { selectedLevelId = null; $('al_groupsList').innerHTML = '<small class="dialog-copy">No levels yet — add one below.</small>'; $('al_personsList').innerHTML = ''; }
 }
+
+$('al_allLevelsList').addEventListener('click', (event) => {
+  const row = event.target.closest('[data-level-id]');
+  if (!row) return;
+  $('al_levelSelect').value = row.dataset.levelId;
+  loadLevelDetails();
+});
 
 async function loadLevelDetails() {
   selectedLevelId = $('al_levelSelect').value;
@@ -1318,11 +1348,26 @@ async function loadProjects() {
   const response = await jsonpRequest({ action: 'listProjects' });
   if (!response || !response.ok) { showToast('Could not load projects'); return; }
   const projects = response.projects || [];
+  $('ap_allProjectsList').innerHTML = projects.length ? projects.map((p) => `
+    <div class="person-summary-row" data-project-id="${p.id}" role="button" tabindex="0">
+      <div class="person-avatar">${escapeHtml(p.name.charAt(0).toUpperCase())}</div>
+      <div class="person-summary-main">
+        <div class="person-summary-name">${escapeHtml(p.name)}</div>
+        <div class="person-summary-meta">${escapeHtml([p.location, p.status].filter(Boolean).join(' · ')) || 'No details yet'}</div>
+      </div>
+    </div>`).join('') : '<small class="dialog-copy">No projects yet — add one below.</small>';
   const keepSelection = projects.some((p) => String(p.id) === String(selectedPayProjectId));
   $('ap_projectSelect').innerHTML = projects.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('') || '<option value="">No projects yet</option>';
   if (projects.length) { $('ap_projectSelect').value = keepSelection ? selectedPayProjectId : projects[0].id; loadLinkedGroups(); }
-  else { selectedPayProjectId = null; $('ap_linkedGroupsList').innerHTML = '<small class="dialog-copy">No projects yet — add one below.</small>'; }
+  else { selectedPayProjectId = null; $('ap_linkedGroupsList').innerHTML = '<small class="dialog-copy">No projects yet — add one below.</small>'; $('ap_hierarchyView').innerHTML = '<small class="dialog-copy">No project selected.</small>'; }
 }
+
+$('ap_allProjectsList').addEventListener('click', (event) => {
+  const row = event.target.closest('[data-project-id]');
+  if (!row) return;
+  $('ap_projectSelect').value = row.dataset.projectId;
+  loadLinkedGroups();
+});
 
 async function loadLinkedGroups() {
   selectedPayProjectId = $('ap_projectSelect').value;
@@ -1341,6 +1386,37 @@ async function loadLinkedGroups() {
   const linkedIds = new Set(linked.map((g) => String(g.groupId)));
   const available = allGroups.filter((g) => !linkedIds.has(String(g.id)));
   $('ap_addGroupSelect').innerHTML = available.length ? available.map((g) => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('') : '<option value="">No groups left to link</option>';
+  await renderProjectHierarchy(linked);
+}
+
+// For each group linked to the selected project, show who can access it
+// (its levels) and who's in it (its members) — the downward chain from
+// project to group to level/person.
+async function renderProjectHierarchy(linkedGroups) {
+  const projectName = $('ap_projectSelect').selectedOptions[0] ? $('ap_projectSelect').selectedOptions[0].textContent : '';
+  if (!linkedGroups.length) {
+    $('ap_hierarchyView').innerHTML = `<div class="hierarchy-node">${escapeHtml(projectName)}</div><div class="hierarchy-leaf">No groups linked yet.</div>`;
+    return;
+  }
+  const details = await Promise.all(linkedGroups.map(async (g) => {
+    const [levelsRes, membersRes] = await Promise.all([
+      jsonpRequest({ action: 'groupLevels', groupId: g.groupId }),
+      jsonpRequest({ action: 'groupMembers', groupId: g.groupId }),
+    ]);
+    return {
+      name: g.groupName,
+      levels: (levelsRes && levelsRes.ok) ? levelsRes.levels : [],
+      members: (membersRes && membersRes.ok) ? membersRes.members : [],
+    };
+  }));
+  $('ap_hierarchyView').innerHTML = `<div class="hierarchy-node">${escapeHtml(projectName)}</div>` + details.map((g) => `
+    <div class="hierarchy-children">
+      <div class="hierarchy-node">Group: ${escapeHtml(g.name)}</div>
+      <div class="hierarchy-children">
+        <div class="hierarchy-leaf">Levels: ${g.levels.length ? g.levels.map((l) => escapeHtml(l.levelName)).join(', ') : 'none granted'}</div>
+        <div class="hierarchy-leaf">Members: ${g.members.length ? g.members.map((m) => escapeHtml(m.person)).join(', ') : 'none yet'}</div>
+      </div>
+    </div>`).join('');
 }
 
 $('ap_projectSelect').addEventListener('change', loadLinkedGroups);
