@@ -13,6 +13,11 @@ let committeeInstalments = [];
 let committeeMonths = [];
 let selectedCommitteeNo = null;
 let committeeSub = 'month';
+let accessSub = 'groups';
+let groups = [];
+let authLevels = [];
+let selectedGroupId = null;
+let selectedLevelId = null;
 let manageSub = 'list';
 let analysisData = { committees: [], instalments: [], months: [] };
 let analysisReport = 'month';
@@ -248,6 +253,7 @@ function switchView(view) {
   $('verifyView').hidden = view !== 'verify';
   $('personDetailView').hidden = view !== 'personDetail';
   $('committeeView').hidden = view !== 'committee';
+  $('accessView').hidden = view !== 'access';
   document.querySelectorAll('.tab-button[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view || (view === 'personDetail' && button.dataset.view === 'people')));
   if (view === 'people') {
     renderPeopleDirectory();
@@ -259,6 +265,7 @@ function switchView(view) {
   }
   if (view === 'verify') loadUnverified();
   if (view === 'committee') { loadCommittees(); switchCommitteeSub(committeeSub); loadCommitteeUnverifiedBadge(); }
+  if (view === 'access') switchAccessSub(accessSub);
 }
 
 // Top-level Committee flow: Fill (month) -> Verify -> View (analysis), with
@@ -1159,6 +1166,199 @@ $('managePeopleList').addEventListener('click', (event) => {
 });
 $('verifySubmitButton').addEventListener('click', submitVerification);
 $('exportButton').addEventListener('click', () => { const blob = new Blob([JSON.stringify(entries, null, 2)], { type:'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `khata-daily-${today()}.json`; link.click(); URL.revokeObjectURL(link.href); });
+
+// ---------- Access: Groups / Levels / Team / Projects (management only, no login yet) ----------
+
+function switchAccessSub(sub) {
+  accessSub = sub;
+  ['groups', 'levels', 'team', 'projects'].forEach((name) => { $(`accessSub-${name}`).hidden = name !== sub; });
+  document.querySelectorAll('#accessView > .type-switch [data-asub]').forEach((button) => button.classList.toggle('active', button.dataset.asub === sub));
+  if (sub === 'groups') loadGroups();
+  if (sub === 'levels') loadAuthLevels();
+  if (sub === 'team') { loadAuthLevels(); loadAppUsers(); }
+  if (sub === 'projects') loadProjects();
+}
+
+async function loadGroups() {
+  const response = await jsonpRequest({ action: 'listGroups' });
+  if (!response || !response.ok) { showToast('Could not load groups'); return; }
+  groups = response.groups || [];
+  const keepSelection = groups.some((g) => String(g.id) === String(selectedGroupId));
+  $('ag_groupSelect').innerHTML = groups.map((g) => `<option value="${g.id}">${escapeHtml(g.name)} (${g.memberCount})</option>`).join('') || '<option value="">No groups yet</option>';
+  if (groups.length) { $('ag_groupSelect').value = keepSelection ? selectedGroupId : groups[0].id; loadGroupMembers(); }
+  else { selectedGroupId = null; $('ag_membersList').innerHTML = '<small class="dialog-copy">No groups yet — add one below.</small>'; }
+}
+
+async function loadGroupMembers() {
+  selectedGroupId = $('ag_groupSelect').value;
+  if (!selectedGroupId) return;
+  const response = await jsonpRequest({ action: 'groupMembers', groupId: selectedGroupId });
+  if (!response || !response.ok) { showToast('Could not load members'); return; }
+  const members = response.members || [];
+  $('ag_membersList').innerHTML = members.length ? members.map((m) => `
+    <div class="manage-person-row">
+      <span>${escapeHtml(m.person)}</span>
+      <button type="button" class="text-button" data-remove-member="${m.id}">Remove</button>
+    </div>`).join('') : '<small class="dialog-copy">No members yet.</small>';
+  const memberNames = new Set(members.map((m) => m.person));
+  const available = people.filter((name) => !memberNames.has(name));
+  $('ag_addPersonSelect').innerHTML = available.length ? available.map((name) => `<option>${escapeHtml(name)}</option>`).join('') : '<option value="">No one left to add</option>';
+}
+
+$('ag_groupSelect').addEventListener('change', loadGroupMembers);
+$('ag_addMemberButton').addEventListener('click', async () => {
+  const person = $('ag_addPersonSelect').value;
+  if (!person || !selectedGroupId) return;
+  const response = await jsonpRequest({ action: 'addGroupMember', groupId: selectedGroupId, person });
+  if (!response || !response.ok) { showToast('Could not add member'); return; }
+  await loadGroups();
+});
+$('ag_membersList').addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-remove-member]');
+  if (!button) return;
+  const response = await jsonpRequest({ action: 'removeGroupMember', id: button.dataset.removeMember });
+  if (!response || !response.ok) { showToast('Could not remove member'); return; }
+  await loadGroups();
+});
+$('ag_addGroupButton').addEventListener('click', async () => {
+  const name = $('ag_newGroupName').value.trim();
+  if (!name) return;
+  const response = await jsonpRequest({ action: 'addGroup', name, description: $('ag_newGroupDesc').value.trim() });
+  if (!response || !response.ok) { showToast('Could not add group'); return; }
+  $('ag_newGroupName').value = ''; $('ag_newGroupDesc').value = '';
+  showToast(`${name} added`);
+  await loadGroups();
+});
+
+async function loadAuthLevels() {
+  const response = await jsonpRequest({ action: 'listAuthLevels' });
+  if (!response || !response.ok) { showToast('Could not load levels'); return; }
+  authLevels = response.levels || [];
+  const options = authLevels.map((l) => `<option value="${l.id}">${escapeHtml(l.name)} (rank ${l.rank})</option>`).join('');
+  const keepSelection = authLevels.some((l) => String(l.id) === String(selectedLevelId));
+  $('al_levelSelect').innerHTML = options || '<option value="">No levels yet</option>';
+  $('at_newUserLevel').innerHTML = options || '<option value="">Add a level first</option>';
+  if (authLevels.length) { $('al_levelSelect').value = keepSelection ? selectedLevelId : authLevels[0].id; loadLevelDetails(); }
+  else { selectedLevelId = null; $('al_groupsList').innerHTML = '<small class="dialog-copy">No levels yet — add one below.</small>'; $('al_personsList').innerHTML = ''; }
+}
+
+async function loadLevelDetails() {
+  selectedLevelId = $('al_levelSelect').value;
+  if (!selectedLevelId) return;
+  const [groupsRes, personsRes] = await Promise.all([
+    jsonpRequest({ action: 'levelGroups', levelId: selectedLevelId }),
+    jsonpRequest({ action: 'levelPersons', levelId: selectedLevelId }),
+  ]);
+  const grantedGroups = (groupsRes && groupsRes.ok) ? groupsRes.groups : [];
+  const grantedPersons = (personsRes && personsRes.ok) ? personsRes.persons : [];
+  $('al_groupsList').innerHTML = grantedGroups.length ? grantedGroups.map((g) => `
+    <div class="manage-person-row">
+      <span>${escapeHtml(g.groupName)}</span>
+      <button type="button" class="text-button" data-revoke-group="${g.id}">Revoke</button>
+    </div>`).join('') : '<small class="dialog-copy">No groups granted yet.</small>';
+  $('al_personsList').innerHTML = grantedPersons.length ? grantedPersons.map((p) => `
+    <div class="manage-person-row">
+      <span>${escapeHtml(p.person)}</span>
+      <button type="button" class="text-button" data-revoke-person="${p.id}">Revoke</button>
+    </div>`).join('') : '<small class="dialog-copy">No people granted directly yet.</small>';
+  const grantedGroupIds = new Set(grantedGroups.map((g) => String(g.groupId)));
+  const availableGroups = groups.filter((g) => !grantedGroupIds.has(String(g.id)));
+  $('al_addGroupSelect').innerHTML = availableGroups.length ? availableGroups.map((g) => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('') : '<option value="">No groups left to grant</option>';
+  const grantedPersonNames = new Set(grantedPersons.map((p) => p.person));
+  const availablePersons = people.filter((name) => !grantedPersonNames.has(name));
+  $('al_addPersonSelect').innerHTML = availablePersons.length ? availablePersons.map((name) => `<option>${escapeHtml(name)}</option>`).join('') : '<option value="">No one left to add</option>';
+}
+
+$('al_levelSelect').addEventListener('change', loadLevelDetails);
+$('al_grantGroupButton').addEventListener('click', async () => {
+  const groupId = $('al_addGroupSelect').value;
+  if (!groupId || !selectedLevelId) return;
+  const response = await jsonpRequest({ action: 'grantLevelGroup', levelId: selectedLevelId, groupId });
+  if (!response || !response.ok) { showToast('Could not grant group'); return; }
+  await loadLevelDetails();
+});
+$('al_grantPersonButton').addEventListener('click', async () => {
+  const person = $('al_addPersonSelect').value;
+  if (!person || !selectedLevelId) return;
+  const response = await jsonpRequest({ action: 'grantLevelPerson', levelId: selectedLevelId, person });
+  if (!response || !response.ok) { showToast('Could not grant person'); return; }
+  await loadLevelDetails();
+});
+$('al_groupsList').addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-revoke-group]');
+  if (!button) return;
+  const response = await jsonpRequest({ action: 'revokeLevelGroup', id: button.dataset.revokeGroup });
+  if (!response || !response.ok) { showToast('Could not revoke'); return; }
+  await loadLevelDetails();
+});
+$('al_personsList').addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-revoke-person]');
+  if (!button) return;
+  const response = await jsonpRequest({ action: 'revokeLevelPerson', id: button.dataset.revokePerson });
+  if (!response || !response.ok) { showToast('Could not revoke'); return; }
+  await loadLevelDetails();
+});
+$('al_addLevelButton').addEventListener('click', async () => {
+  const name = $('al_newLevelName').value.trim();
+  const rank = $('al_newLevelRank').value;
+  if (!name || rank === '') { showToast('Enter a name and rank'); return; }
+  const response = await jsonpRequest({ action: 'addAuthLevel', name, rank, description: $('al_newLevelDesc').value.trim() });
+  if (!response || !response.ok) { showToast('Could not add level'); return; }
+  $('al_newLevelName').value = ''; $('al_newLevelRank').value = ''; $('al_newLevelDesc').value = '';
+  showToast(`${name} added`);
+  await loadAuthLevels();
+});
+
+async function loadAppUsers() {
+  const response = await jsonpRequest({ action: 'listAppUsers' });
+  if (!response || !response.ok) { showToast('Could not load team'); return; }
+  const users = response.users || [];
+  $('at_userList').innerHTML = users.length ? users.map((u) => `
+    <div class="manage-person-row">
+      <span>${escapeHtml(u.username)}</span>
+      <small class="dialog-copy">${escapeHtml(u.levelName || 'No level')}</small>
+    </div>`).join('') : '<small class="dialog-copy">No team members yet.</small>';
+}
+
+$('at_addUserButton').addEventListener('click', async () => {
+  const username = $('at_newUsername').value.trim();
+  const levelId = $('at_newUserLevel').value;
+  if (!username || !levelId) { showToast('Enter a username and pick a level'); return; }
+  const response = await jsonpRequest({ action: 'addAppUser', username, levelId });
+  if (!response || !response.ok) { showToast('Could not add team member'); return; }
+  $('at_newUsername').value = '';
+  showToast(`${username} added`);
+  await loadAppUsers();
+});
+
+async function loadProjects() {
+  const response = await jsonpRequest({ action: 'listProjects' });
+  if (!response || !response.ok) { showToast('Could not load projects'); return; }
+  const projects = response.projects || [];
+  $('ap_projectList').innerHTML = projects.length ? projects.map((p) => `
+    <div class="manage-person-row">
+      <span>${escapeHtml(p.name)}</span>
+      <small class="dialog-copy">${escapeHtml([p.location, p.status].filter(Boolean).join(' · '))}</small>
+    </div>`).join('') : '<small class="dialog-copy">No projects yet.</small>';
+}
+
+$('ap_addProjectButton').addEventListener('click', async () => {
+  const name = $('ap_newProjectName').value.trim();
+  if (!name) return;
+  const response = await jsonpRequest({
+    action: 'addProject', name,
+    location: $('ap_newProjectLocation').value.trim(),
+    status: $('ap_newProjectStatus').value.trim(),
+    startDate: $('ap_newProjectStart').value,
+  });
+  if (!response || !response.ok) { showToast('Could not add project'); return; }
+  $('ap_newProjectName').value = ''; $('ap_newProjectLocation').value = ''; $('ap_newProjectStatus').value = ''; $('ap_newProjectStart').value = '';
+  showToast(`${name} added`);
+  await loadProjects();
+});
+
+document.querySelectorAll('#accessView > .type-switch [data-asub]').forEach((button) => button.addEventListener('click', () => switchAccessSub(button.dataset.asub)));
+
 render();
 switchView('people');
 loadPeople();

@@ -234,12 +234,87 @@
         </div>
       </div>
     </section>
+
+    <section id="accessView" class="view" hidden>
+      <div class="section-heading">
+        <div><p class="eyebrow">MANAGEMENT ONLY — NO LOGIN YET</p><h2 class="view-title">Access</h2></div>
+      </div>
+      <div class="type-switch" role="group" aria-label="Access sections">
+        <button type="button" class="type-option active" data-asub="groups">Groups</button>
+        <button type="button" class="type-option" data-asub="levels">Levels</button>
+        <button type="button" class="type-option" data-asub="team">Team</button>
+        <button type="button" class="type-option" data-asub="projects">Projects</button>
+      </div>
+
+      <div class="access-sub" id="accessSub-groups">
+        <label>Group<select id="ag_groupSelect"></select></label>
+        <p class="dialog-copy" id="ag_membersHeading">Members</p>
+        <div class="manage-people-list" id="ag_membersList"><small class="dialog-copy">No group selected.</small></div>
+        <div class="add-person-row">
+          <select id="ag_addPersonSelect"></select>
+          <button class="primary-button" id="ag_addMemberButton" type="button">Add member</button>
+        </div>
+        <p class="eyebrow">NEW GROUP</p>
+        <div class="add-person-row">
+          <input id="ag_newGroupName" type="text" placeholder="Group name">
+          <input id="ag_newGroupDesc" type="text" placeholder="Description (optional)">
+          <button class="primary-button" id="ag_addGroupButton" type="button">Add group</button>
+        </div>
+      </div>
+
+      <div class="access-sub" id="accessSub-levels" hidden>
+        <label>Auth level<select id="al_levelSelect"></select></label>
+        <p class="dialog-copy">Groups granted to this level</p>
+        <div class="manage-people-list" id="al_groupsList"><small class="dialog-copy">No level selected.</small></div>
+        <div class="add-person-row">
+          <select id="al_addGroupSelect"></select>
+          <button class="primary-button" id="al_grantGroupButton" type="button">Grant group</button>
+        </div>
+        <p class="dialog-copy">People granted directly to this level</p>
+        <div class="manage-people-list" id="al_personsList"></div>
+        <div class="add-person-row">
+          <select id="al_addPersonSelect"></select>
+          <button class="primary-button" id="al_grantPersonButton" type="button">Grant person</button>
+        </div>
+        <p class="eyebrow">NEW LEVEL</p>
+        <div class="add-person-row">
+          <input id="al_newLevelName" type="text" placeholder="Level name (e.g. Manager)">
+          <input id="al_newLevelRank" type="number" placeholder="Rank (e.g. 2)">
+          <input id="al_newLevelDesc" type="text" placeholder="Description (optional)">
+          <button class="primary-button" id="al_addLevelButton" type="button">Add level</button>
+        </div>
+      </div>
+
+      <div class="access-sub" id="accessSub-team" hidden>
+        <div class="manage-people-list" id="at_userList"><small class="dialog-copy">No team members yet.</small></div>
+        <p class="eyebrow">NEW TEAM MEMBER</p>
+        <p class="dialog-copy">No password yet — login isn't wired up. This just records who exists and what level they're at.</p>
+        <div class="add-person-row">
+          <input id="at_newUsername" type="text" placeholder="Username">
+          <select id="at_newUserLevel"></select>
+          <button class="primary-button" id="at_addUserButton" type="button">Add team member</button>
+        </div>
+      </div>
+
+      <div class="access-sub" id="accessSub-projects" hidden>
+        <div class="manage-people-list" id="ap_projectList"><small class="dialog-copy">No projects yet.</small></div>
+        <p class="eyebrow">NEW PROJECT</p>
+        <div class="add-person-row">
+          <input id="ap_newProjectName" type="text" placeholder="Project name">
+          <input id="ap_newProjectLocation" type="text" placeholder="Location (optional)">
+          <input id="ap_newProjectStatus" type="text" placeholder="Status (optional)">
+          <input id="ap_newProjectStart" type="date">
+          <button class="primary-button" id="ap_addProjectButton" type="button">Add project</button>
+        </div>
+      </div>
+    </section>
   </main>
 
   <nav class="tab-bar" aria-label="Sections">
     <button type="button" class="tab-button active" data-view="people"><span class="tab-icon">⌂</span>Home</button>
     <button type="button" class="tab-button" data-view="verify"><span class="tab-icon">✓</span>Verify<span class="tab-badge" id="verifyBadge" hidden>0</span></button>
     <button type="button" class="tab-button" data-view="committee"><span class="tab-icon">◈</span>Committee</button>
+    <button type="button" class="tab-button" data-view="access"><span class="tab-icon">▦</span>Access</button>
     <button type="button" class="tab-button" id="settingsTabButton"><span class="tab-icon">⚙</span>Settings</button>
   </nav>
 

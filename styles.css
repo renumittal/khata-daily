@@ -956,6 +956,19 @@ dialog::backdrop {
     margin-top: 14px;
 }
 
+.access-sub {
+    margin-top: 14px;
+}
+
+.access-sub label {
+    display: block;
+    margin-bottom: 14px;
+}
+
+.access-sub .eyebrow {
+    margin-top: 22px;
+}
+
 .stat-row {
     display: grid;
     grid-template-columns: repeat(3,1fr);

@@ -194,6 +194,114 @@ async function apiRequest(params) {
       return { ok: true, results };
     }
 
+    if (action === 'listGroups') {
+      const [groupsRes, membersRes] = await Promise.all([
+        db.from('groups').select('id, name, description').order('name'),
+        db.from('person_group').select('group_id').is('valid_to', null),
+      ]);
+      if (groupsRes.error) throw groupsRes.error;
+      if (membersRes.error) throw membersRes.error;
+      const counts = {};
+      membersRes.data.forEach((row) => { counts[row.group_id] = (counts[row.group_id] || 0) + 1; });
+      return { ok: true, groups: groupsRes.data.map((g) => ({ id: g.id, name: g.name, description: g.description || '', memberCount: counts[g.id] || 0 })) };
+    }
+
+    if (action === 'addGroup') {
+      const { error } = await db.from('groups').insert({ name: params.name, description: params.description || '' });
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    if (action === 'groupMembers') {
+      const { data, error } = await db.from('person_group').select('id, person').eq('group_id', params.groupId).is('valid_to', null).order('person');
+      if (error) throw error;
+      return { ok: true, members: data };
+    }
+
+    if (action === 'addGroupMember') {
+      const { error } = await db.from('person_group').insert({ person: params.person, group_id: params.groupId });
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    if (action === 'removeGroupMember') {
+      const { error } = await db.from('person_group').update({ valid_to: new Date().toISOString().slice(0, 10) }).eq('id', params.id);
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    if (action === 'listAuthLevels') {
+      const { data, error } = await db.from('auth_level').select('id, name, rank, description').order('rank');
+      if (error) throw error;
+      return { ok: true, levels: data };
+    }
+
+    if (action === 'addAuthLevel') {
+      const { error } = await db.from('auth_level').insert({ name: params.name, rank: Number(params.rank) || 0, description: params.description || '' });
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    if (action === 'levelGroups') {
+      const { data, error } = await db.from('auth_level_group').select('id, group_id, groups(name)').eq('auth_level_id', params.levelId).is('valid_to', null);
+      if (error) throw error;
+      return { ok: true, groups: data.map((r) => ({ id: r.id, groupId: r.group_id, groupName: r.groups ? r.groups.name : '' })) };
+    }
+
+    if (action === 'grantLevelGroup') {
+      const { error } = await db.from('auth_level_group').insert({ auth_level_id: params.levelId, group_id: params.groupId });
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    if (action === 'revokeLevelGroup') {
+      const { error } = await db.from('auth_level_group').update({ valid_to: new Date().toISOString().slice(0, 10) }).eq('id', params.id);
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    if (action === 'levelPersons') {
+      const { data, error } = await db.from('auth_level_person').select('id, person').eq('auth_level_id', params.levelId).is('valid_to', null).order('person');
+      if (error) throw error;
+      return { ok: true, persons: data };
+    }
+
+    if (action === 'grantLevelPerson') {
+      const { error } = await db.from('auth_level_person').insert({ auth_level_id: params.levelId, person: params.person });
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    if (action === 'revokeLevelPerson') {
+      const { error } = await db.from('auth_level_person').update({ valid_to: new Date().toISOString().slice(0, 10) }).eq('id', params.id);
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    if (action === 'listAppUsers') {
+      const { data, error } = await db.from('app_user').select('id, username, auth_level_id, auth_level(name)').order('username');
+      if (error) throw error;
+      return { ok: true, users: data.map((u) => ({ id: u.id, username: u.username, authLevelId: u.auth_level_id, levelName: u.auth_level ? u.auth_level.name : '' })) };
+    }
+
+    if (action === 'addAppUser') {
+      const { error } = await db.from('app_user').insert({ username: params.username, auth_level_id: params.levelId });
+      if (error) throw error;
+      return { ok: true };
+    }
+
+    if (action === 'listProjects') {
+      const { data, error } = await db.from('project').select('id, name, location, status, start_date').order('name');
+      if (error) throw error;
+      return { ok: true, projects: data.map((p) => ({ id: p.id, name: p.name, location: p.location || '', status: p.status || '', startDate: p.start_date || '' })) };
+    }
+
+    if (action === 'addProject') {
+      const { error } = await db.from('project').insert({ name: params.name, location: params.location || '', status: params.status || '', start_date: toDateOrNull(params.startDate) });
+      if (error) throw error;
+      return { ok: true };
+    }
+
     return { ok: false, error: `Unknown action: ${action}` };
   } catch (error) {
     console.error('Supabase request failed', action, error);
