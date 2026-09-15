@@ -123,17 +123,32 @@
           <button type="button" class="icon-button" id="projectPayBackButton" aria-label="Back to projects">‹</button>
           <div>
             <h2 id="projectPayName">Project</h2>
-            <small class="dialog-copy">Pay a group for this project</small>
+            <small class="dialog-copy">Pay a person or a group for this project</small>
           </div>
         </div>
       </div>
-      <label>Group<select id="pp_groupSelect"><option value="">Pick a group</option></select></label>
-      <div class="people-heading"><span>People and amounts</span><small id="pp_membersStatus"></small></div>
-      <div class="people-list" id="pp_membersList"><div class="people-placeholder">Pick a group to see its people.</div></div>
-      <label>Paid by<select id="pp_distributorSelect"><option value="">Pick who's paying</option></select></label>
-      <p class="dialog-copy">The distributor must already exist as a name in Home/People with the exact same name as their username — their side of each payment attaches to that name.</p>
+      <label>From<select id="pp_fromSelect"><option value="">Who's giving the money</option></select></label>
+      <div class="type-switch" role="group" aria-label="Pay a person or a group">
+        <button type="button" class="type-option active" data-ppto="person">A person</button>
+        <button type="button" class="type-option" data-ppto="group">A group</button>
+      </div>
+
+      <div id="pp_toPerson">
+        <label>To<select id="pp_toPersonSelect"><option value="">Who's receiving</option></select></label>
+        <div class="field-row">
+          <label>Amount<input id="pp_personAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Amount"></label>
+          <label>Note (optional)<input id="pp_personNote" type="text" placeholder="Note"></label>
+        </div>
+      </div>
+
+      <div id="pp_toGroup" hidden>
+        <label>Group<select id="pp_groupSelect"><option value="">Pick a group</option></select></label>
+        <div class="people-heading"><span>People and amounts</span><small id="pp_membersStatus"></small></div>
+        <div class="people-list" id="pp_membersList"><div class="people-placeholder">Pick a group to see its people.</div></div>
+      </div>
+
       <label>Date<input id="pp_date" type="date"></label>
-      <button class="primary-button" id="pp_saveButton" type="button"><span>＋</span> Pay group</button>
+      <button class="primary-button" id="pp_saveButton" type="button"><span>＋</span> Pay</button>
     </section>
 
     <section id="committeeView" class="view" hidden>
@@ -261,7 +276,6 @@
       <div class="type-switch" role="group" aria-label="Access sections">
         <button type="button" class="type-option active" data-asub="groups">Groups</button>
         <button type="button" class="type-option" data-asub="levels">Levels</button>
-        <button type="button" class="type-option" data-asub="team">Team</button>
         <button type="button" class="type-option" data-asub="projects">Projects</button>
       </div>
 
@@ -301,17 +315,6 @@
           <input id="al_newLevelRank" type="number" placeholder="Rank (e.g. 2)">
           <input id="al_newLevelDesc" type="text" placeholder="Description (optional)">
           <button class="primary-button" id="al_addLevelButton" type="button">Add level</button>
-        </div>
-      </div>
-
-      <div class="access-sub" id="accessSub-team" hidden>
-        <div class="manage-people-list" id="at_userList"><small class="dialog-copy">No team members yet.</small></div>
-        <p class="eyebrow">NEW TEAM MEMBER</p>
-        <p class="dialog-copy">No password yet — login isn't wired up. This just records who exists and what level they're at.</p>
-        <div class="add-person-row">
-          <input id="at_newUsername" type="text" placeholder="Username">
-          <select id="at_newUserLevel"></select>
-          <button class="primary-button" id="at_addUserButton" type="button">Add team member</button>
         </div>
       </div>
 
