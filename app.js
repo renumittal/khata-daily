@@ -13,7 +13,7 @@ let committeeInstalments = [];
 let committeeMonths = [];
 let selectedCommitteeNo = null;
 let committeeSub = 'month';
-let accessSub = 'groups';
+let accessSub = 'people';
 let groups = [];
 let authLevels = [];
 let selectedGroupId = null;
@@ -1015,7 +1015,7 @@ $('entryForm').addEventListener('submit', async (event) => {
 $('clearFilter').addEventListener('click', () => { showingAll = !showingAll; render(); });
 
 document.querySelectorAll('.tab-button[data-view]').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
-$('settingsTabButton').addEventListener('click', () => { $('settingsDialog').showModal(); loadAllPeople(); });
+$('settingsTabButton').addEventListener('click', () => { $('settingsDialog').showModal(); });
 $('peopleSearch').addEventListener('input', renderPeopleDirectory);
 $('peopleDirectory').addEventListener('click', (event) => {
   const row = event.target.closest('.person-summary-row');
@@ -1174,8 +1174,9 @@ $('exportButton').addEventListener('click', () => { const blob = new Blob([JSON.
 
 function switchAccessSub(sub) {
   accessSub = sub;
-  ['groups', 'levels', 'projects'].forEach((name) => { $(`accessSub-${name}`).hidden = name !== sub; });
+  ['people', 'groups', 'levels', 'projects'].forEach((name) => { $(`accessSub-${name}`).hidden = name !== sub; });
   document.querySelectorAll('#accessView > .type-switch [data-asub]').forEach((button) => button.classList.toggle('active', button.dataset.asub === sub));
+  if (sub === 'people') loadAllPeople();
   if (sub === 'groups') loadGroups();
   if (sub === 'levels') loadAuthLevels();
   if (sub === 'projects') loadProjects();

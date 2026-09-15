@@ -280,12 +280,23 @@
         <div><p class="eyebrow">MANAGEMENT ONLY — NO LOGIN YET</p><h2 class="view-title">Access</h2></div>
       </div>
       <div class="type-switch" role="group" aria-label="Access sections">
-        <button type="button" class="type-option active" data-asub="groups">Groups</button>
+        <button type="button" class="type-option active" data-asub="people">People</button>
+        <button type="button" class="type-option" data-asub="groups">Groups</button>
         <button type="button" class="type-option" data-asub="levels">Levels</button>
         <button type="button" class="type-option" data-asub="projects">Projects</button>
       </div>
 
-      <div class="access-sub" id="accessSub-groups">
+      <div class="access-sub" id="accessSub-people">
+        <p class="dialog-copy">Add someone new, or hide someone you no longer split money with. Their past entries stay either way.</p>
+        <div class="add-person-row">
+          <input id="newPersonName" type="text" placeholder="Name">
+          <input id="newPersonMobile" type="tel" inputmode="tel" placeholder="Mobile number (optional)">
+          <button class="primary-button" id="addPersonButton" type="button">Add</button>
+        </div>
+        <div class="manage-people-list" id="managePeopleList"><small class="dialog-copy">Loading...</small></div>
+      </div>
+
+      <div class="access-sub" id="accessSub-groups" hidden>
         <label>Group<select id="ag_groupSelect"></select></label>
         <p class="dialog-copy" id="ag_membersHeading">Members</p>
         <div class="manage-people-list" id="ag_membersList"><small class="dialog-copy">No group selected.</small></div>
@@ -357,15 +368,8 @@
   <dialog id="settingsDialog">
     <form method="dialog" class="dialog-card" id="settingsForm">
       <button class="close-button" value="cancel" aria-label="Close settings">×</button>
-      <p class="eyebrow">PEOPLE</p><h2>Manage names</h2>
-      <p class="dialog-copy">Add someone new, or hide someone you no longer split money with. Their past entries stay in the Sheet either way.</p>
-      <div class="add-person-row">
-        <input id="newPersonName" type="text" placeholder="Name">
-        <input id="newPersonMobile" type="tel" inputmode="tel" placeholder="Mobile number (optional)">
-        <button class="primary-button" id="addPersonButton" type="button">Add</button>
-      </div>
-      <div class="manage-people-list" id="managePeopleList"><small class="dialog-copy">Loading...</small></div>
-
+      <p class="eyebrow">SETTINGS</p><h2>Settings</h2>
+      <p class="dialog-copy">Manage names moved to the Access tab → People.</p>
       <button class="danger-button" id="exportButton" type="button">Export local entries</button>
     </form>
   </dialog>
